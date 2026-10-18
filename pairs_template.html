@@ -339,7 +339,8 @@ function showDetail(id, scroll) {
     const nl = p.long === p.a ? p.na : p.nb, ns = p.short === p.a ? p.na : p.nb;
     F('d-meta').textContent = `${nl} / ${ns} · ${p.sector} · ${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region} · ${p.ca === p.cb ? p.ca : p.ca + ' / ' + p.cb + ' (Spread in EUR)'} · ${p.n} gemeinsame Handelstage · Stand ${p.last}`;
     const ratio = p.long === p.a ? p.beta : 1 / p.beta;  // Geld in Short pro 1 Geld in Long
-    F('d-trade').innerHTML = `<b>Trade-Idee:</b> Spread ${p.z > 0 ? 'über' : 'unter'} dem Mittel (z = <b class="${zClass(p.z)}">${fmt(p.z)}</b>). Für 10.000 € Long <b>${esc(p.long)}</b> ca. <b>${fmt(ratio*10000,0)} €</b> Short <b>${esc(p.short)}</b> (Hedge Ratio β = ${fmt(p.beta,3)} für ${esc(p.b)} ~ ${esc(p.a)}). Erwartete Spread-Bewegung bis zum Mittel: <b>${fmt(p.move,1)}%</b>. Status: <span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? 'kein Signal' : p.status}</span>${Math.abs(p.z) >= CFG.z_extreme ? ' – <span class="r">Strukturbruch prüfen!</span>' : ''}`;
+    const cur = p.ca === p.cb ? (p.ca === 'GBp' ? 'GBP' : p.ca) : 'EUR';
+    F('d-trade').innerHTML = `<b>Trade-Idee:</b> Spread ${p.z > 0 ? 'über' : 'unter'} dem Mittel (z = <b class="${zClass(p.z)}">${fmt(p.z)}</b>). Für 10.000 ${cur} Long <b>${esc(p.long)}</b> ca. <b>${fmt(ratio*10000,0)} ${cur}</b> Short <b>${esc(p.short)}</b> (Hedge Ratio β = ${fmt(p.beta,3)} für ${esc(p.b)} ~ ${esc(p.a)}). Erwartete Spread-Bewegung bis zum Mittel: <b>${fmt(p.move,1)}%</b>. Status: <span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? 'kein Signal' : p.status}</span>${Math.abs(p.z) >= CFG.z_extreme ? ' – <span class="r">Strukturbruch prüfen!</span>' : ''}`;
     F('d-facts').innerHTML = [
         ['Z-Score', fmt(p.z), 'vor 5d ' + fmt(p.z5) + ' · vor 20d ' + fmt(p.z20), zClass(p.z)],
         ['p-Wert (EG)', fmt(p.p,4), p.p < 0.01 ? 'sehr stark' : p.p < 0.05 ? 'kointegriert' : 'schwach', pClass(p.p)],

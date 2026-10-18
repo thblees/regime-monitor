@@ -43,6 +43,7 @@ CFG = {
     "series_days": 252,        # Länge der Chart-Serien im JSON
     "series_max_pairs": 250,   # Für wie viele Paare Chart-Serien ausgegeben werden
     "report_max_pvalue": 0.20, # Paare mit höherem p-Wert kommen nicht ins JSON
+    "beta_range": (0.2, 5.0),  # Hedge Ratios außerhalb sind keine sinnvollen Paare (β≈0: Spread = Einzelaktie)
     "z_setup": 2.0,            # |z| ab dem ein Paar als SETUP gilt
     "z_watch": 1.5,            # |z| ab dem ein Paar auf WATCH steht
     "quality_min": 55,         # Mindest-Qualitätsscore für SETUP/WATCH
@@ -250,7 +251,7 @@ def analyze_pair(a, b, pa, pb):
         return None
 
     beta, alpha = np.polyfit(la.values, lb.values, 1)
-    if beta <= 0:
+    if not (CFG["beta_range"][0] <= beta <= CFG["beta_range"][1]):
         return None
     resid = lb - (alpha + beta * la)
     sd = resid.std(ddof=1)
