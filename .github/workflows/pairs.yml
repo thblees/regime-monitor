@@ -1,0 +1,39 @@
+name: Update Pairs Screener
+
+on:
+  schedule:
+    # 22:30 UTC = 00:30 deutsche Zeit (Sommerzeit) bzw. 23:30 (Winterzeit)
+    # Laeuft Di-Sa nach US-Boersenschluss, eine Stunde vor dem Regime-Monitor-Update
+    - cron: '30 22 * * 2-6'
+  workflow_dispatch:
+
+concurrency:
+  group: pages-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install yfinance pandas numpy statsmodels scipy
+
+      - name: Run screener
+        run: python pairs_screener.py
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'Auto-update pairs screener'
+          file_pattern: 'pairs.html pairs_data.json'

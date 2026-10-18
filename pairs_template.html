@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pairs-Trading-Screener · Thomas Bleeß</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root {
+    --bg:#0a0e1a; --bg-card:#121826; --bg-elevated:#1a2236; --border:#1f2a3e;
+    --text:#e2e8f0; --text-dim:#94a3b8; --text-muted:#64748b;
+    --green:#4ade80; --yellow:#fbbf24; --red:#ef4444; --blue:#60a5fa; --purple:#c084fc; --accent:#60a5fa;
+    --mono:'JetBrains Mono',monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:'Inter Tight',sans-serif; line-height:1.5; min-height:100vh;
+    background-image:radial-gradient(at 20% 0%,rgba(96,165,250,0.05) 0,transparent 50%),radial-gradient(at 80% 50%,rgba(74,222,128,0.03) 0,transparent 50%); }
+.container { max-width:1500px; margin:0 auto; padding:32px 24px; }
+.back-link { display:inline-block; color:var(--blue); font-size:13px; margin:0 20px 20px 0; text-decoration:none; font-family:var(--mono); }
+.back-link:hover { text-decoration:underline; }
+.header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid var(--border); gap:16px; flex-wrap:wrap; }
+.title-block h1 { font-size:28px; font-weight:800; letter-spacing:-0.02em; margin-bottom:4px; }
+.title-block .subtitle { color:var(--text-dim); font-size:13px; font-family:var(--mono); letter-spacing:0.05em; text-transform:uppercase; }
+.title-block .author { color:var(--text-muted); font-size:12px; margin-top:4px; }
+.title-block .author a { color:var(--blue); text-decoration:none; }
+.timestamp { color:var(--text-dim); font-family:var(--mono); font-size:13px; text-align:right; }
+.timestamp .label { color:var(--text-muted); font-size:11px; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:4px; }
+
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:24px; }
+.kpi { background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+.kpi .l { font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.12em; }
+.kpi .v { font-family:var(--mono); font-size:26px; font-weight:700; margin-top:2px; }
+.kpi .v.g { color:var(--green); } .kpi .v.y { color:var(--yellow); } .kpi .v.b { color:var(--blue); }
+
+.card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px 24px; margin-bottom:24px; }
+.card-title { font-family:var(--mono); font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.15em; margin-bottom:14px; font-weight:500; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+.card-title .hint { text-transform:none; letter-spacing:0; color:var(--text-muted); font-family:'Inter Tight',sans-serif; font-size:12px; }
+
+.setups { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; }
+.setup { background:var(--bg-elevated); border:1px solid var(--border); border-radius:10px; padding:14px 16px; cursor:pointer; position:relative; overflow:hidden; transition:border-color .15s; }
+.setup:hover { border-color:var(--blue); }
+.setup::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--green); }
+.setup.watch::before { background:var(--yellow); }
+.setup.extrem::before { background:var(--red); }
+.setup .legs { font-family:var(--mono); font-size:14px; font-weight:700; display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+.setup .legs .lg { color:var(--green); } .setup .legs .sh { color:var(--red); }
+.setup .names { color:var(--text-dim); font-size:12px; margin:2px 0 8px; }
+.setup .facts { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; font-family:var(--mono); font-size:11px; }
+.setup .facts span { display:block; color:var(--text-muted); font-size:9px; text-transform:uppercase; letter-spacing:0.08em; }
+.setup .facts b { font-weight:600; color:var(--text); }
+.setup .tag { position:absolute; right:12px; top:12px; font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(74,222,128,0.15); color:var(--green); }
+.setup.watch .tag { background:rgba(251,191,36,0.15); color:var(--yellow); }
+.setup.extrem .tag { background:rgba(239,68,68,0.15); color:var(--red); }
+.empty { color:var(--text-muted); font-size:13px; padding:8px 0; }
+
+.filters { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px; }
+.f { display:flex; flex-direction:column; gap:3px; }
+.f label { font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.1em; }
+.f select, .f input { background:var(--bg-elevated); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:7px 9px; font-family:var(--mono); font-size:12px; min-width:90px; }
+.f input[type=text] { min-width:160px; }
+.f select:focus, .f input:focus { outline:none; border-color:var(--blue); }
+.btn { background:var(--bg-elevated); color:var(--text-dim); border:1px solid var(--border); border-radius:6px; padding:7px 12px; font-family:var(--mono); font-size:12px; cursor:pointer; }
+.btn:hover { border-color:var(--blue); color:var(--text); }
+.count { font-family:var(--mono); font-size:12px; color:var(--text-muted); margin-left:auto; }
+
+.tbl-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+table { width:100%; border-collapse:collapse; font-size:12.5px; }
+th { text-align:right; font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.08em; padding:8px 8px; border-bottom:1px solid var(--border); cursor:pointer; white-space:nowrap; user-select:none; position:sticky; top:0; background:var(--bg-card); }
+th.l, td.l { text-align:left; }
+th:hover { color:var(--text); }
+th.sorted { color:var(--blue); }
+td { padding:7px 8px; border-bottom:1px solid rgba(31,42,62,0.6); font-family:var(--mono); text-align:right; white-space:nowrap; }
+td.l { font-family:'Inter Tight',sans-serif; }
+tr.row { cursor:pointer; }
+tr.row:hover td { background:rgba(96,165,250,0.06); }
+tr.row.sel td { background:rgba(96,165,250,0.12); }
+.pair { font-family:var(--mono); font-weight:600; }
+.pair .lg { color:var(--green); } .pair .sh { color:var(--red); } .pair .sep { color:var(--text-muted); margin:0 4px; font-weight:400; }
+.sub { color:var(--text-muted); font-size:11px; display:block; }
+.st { font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:4px; font-weight:600; }
+.st.SETUP { background:rgba(74,222,128,0.15); color:var(--green); }
+.st.WATCH { background:rgba(251,191,36,0.15); color:var(--yellow); }
+.st.EXTREM { background:rgba(239,68,68,0.15); color:var(--red); }
+.st.none { color:var(--text-muted); }
+.g { color:var(--green); } .y { color:var(--yellow); } .r { color:var(--red); } .dim { color:var(--text-dim); } .mut { color:var(--text-muted); }
+.bar { display:inline-block; width:46px; height:6px; background:var(--bg-elevated); border-radius:3px; vertical-align:middle; margin-left:6px; overflow:hidden; }
+.bar i { display:block; height:100%; border-radius:3px; }
+.fxtag { font-size:9px; color:var(--purple); border:1px solid rgba(192,132,252,0.4); border-radius:3px; padding:0 4px; margin-left:6px; vertical-align:middle; }
+.pager { display:flex; gap:8px; justify-content:center; align-items:center; margin-top:12px; font-family:var(--mono); font-size:12px; color:var(--text-dim); }
+
+.detail { display:none; }
+.detail.open { display:block; }
+.detail-head { display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; align-items:flex-start; margin-bottom:16px; }
+.detail-head h2 { font-family:var(--mono); font-size:20px; font-weight:700; }
+.detail-head h2 .lg { color:var(--green); } .detail-head h2 .sh { color:var(--red); }
+.detail-head .meta { color:var(--text-dim); font-size:13px; margin-top:2px; }
+.trade { background:var(--bg-elevated); border:1px solid var(--border); border-radius:8px; padding:12px 14px; font-size:13px; max-width:520px; }
+.trade b { font-family:var(--mono); }
+.facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:18px; }
+.fact { background:var(--bg-elevated); border-radius:8px; padding:10px 12px; }
+.fact .l { font-family:var(--mono); font-size:9.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.1em; }
+.fact .v { font-family:var(--mono); font-size:17px; font-weight:600; margin-top:2px; }
+.fact .s { font-size:11px; color:var(--text-muted); }
+.charts { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.chart-box { position:relative; height:280px; }
+.chart-label { font-family:var(--mono); font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.12em; margin-bottom:8px; }
+.legend { display:flex; gap:14px; font-size:12px; color:var(--text-dim); margin-bottom:6px; flex-wrap:wrap; }
+.legend i { display:inline-block; width:14px; height:3px; border-radius:2px; vertical-align:middle; margin-right:6px; }
+
+details { border:1px solid var(--border); border-radius:8px; margin-bottom:8px; background:var(--bg-elevated); }
+summary { padding:10px 14px; cursor:pointer; font-weight:600; font-size:13px; list-style:none; display:flex; justify-content:space-between; }
+summary::after { content:'+'; color:var(--text-muted); font-family:var(--mono); }
+details[open] summary::after { content:'−'; }
+details .body { padding:0 14px 14px; color:var(--text-dim); font-size:13px; }
+details .body p { margin-bottom:8px; }
+details .body code { font-family:var(--mono); font-size:12px; color:var(--blue); }
+.footer { color:var(--text-muted); font-size:11.5px; font-family:var(--mono); border-top:1px solid var(--border); padding-top:16px; margin-top:8px; line-height:1.7; }
+.footer a { color:var(--blue); text-decoration:none; }
+
+@media (max-width:900px) {
+    .container { padding:20px 16px; }
+    .charts { grid-template-columns:1fr; }
+    .title-block h1 { font-size:22px; }
+    .timestamp { text-align:left; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+<a href="https://thblees.github.io/trading-command-center/" class="back-link">← Command Center</a>
+<a href="index.html" class="back-link">← Regime-Monitor</a>
+
+<div class="header">
+    <div class="title-block">
+        <h1>Pairs-Trading-Screener</h1>
+        <div class="subtitle">Korrelation · Kointegration · Spread-Z-Score · US / Europa / Deutschland</div>
+        <div class="author">Thomas Bleeß · <a href="https://www.meine-geldseite.de" target="_blank" rel="noopener">meine-geldseite.de</a></div>
+    </div>
+    <div class="timestamp">
+        <div class="label">Datenstand</div>
+        <div id="ts"></div>
+    </div>
+</div>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="card">
+    <div class="card-title"><span>Beste Setups heute</span><span class="hint">Qualität ≥ <span id="qmin"></span> und |z| ≥ <span id="zsetup"></span> (grün) bzw. ≥ <span id="zwatch"></span> (gelb) · Klick öffnet Details</span></div>
+    <div class="setups" id="setups"></div>
+</div>
+
+<div class="card detail" id="detail">
+    <div class="detail-head">
+        <div>
+            <h2 id="d-title"></h2>
+            <div class="meta" id="d-meta"></div>
+        </div>
+        <div class="trade" id="d-trade"></div>
+    </div>
+    <div class="facts" id="d-facts"></div>
+    <div class="charts">
+        <div>
+            <div class="chart-label">Spread-Z-Score · letzte 12 Monate</div>
+            <div class="chart-box"><canvas id="c-z"></canvas></div>
+        </div>
+        <div>
+            <div class="chart-label">Kursverlauf · indexiert auf 100</div>
+            <div class="legend" id="d-legend"></div>
+            <div class="chart-box"><canvas id="c-px"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title"><span>Alle Paare</span><span class="hint">Sortierbar per Klick auf die Spalte · Standard: Gesamt-Score (Qualität × Signal)</span></div>
+    <div class="filters">
+        <div class="f"><label>Region</label><select id="f-region"><option value="">Alle</option><option value="DE">Deutschland</option><option value="EU">Europa</option><option value="US">USA</option><option value="Cross">Cross-Region</option></select></div>
+        <div class="f"><label>Sektor</label><select id="f-sector"><option value="">Alle</option></select></div>
+        <div class="f"><label>Status</label><select id="f-status"><option value="">Alle</option><option value="SETUP">Setup</option><option value="WATCH">Watch</option><option value="SETUP,WATCH">Setup + Watch</option><option value="EXTREM">Extrem</option></select></div>
+        <div class="f"><label>Min. Korr.</label><input id="f-corr" type="number" step="0.05" min="0" max="1" value="0.5"></div>
+        <div class="f"><label>Max. p-Wert</label><input id="f-p" type="number" step="0.01" min="0" max="0.2" value="0.05"></div>
+        <div class="f"><label>Min. |z|</label><input id="f-z" type="number" step="0.25" min="0" max="6" value="0"></div>
+        <div class="f"><label>Max. Half-Life</label><input id="f-hl" type="number" step="5" min="1" value="60"></div>
+        <div class="f"><label>FX-Paare</label><select id="f-fx"><option value="">Alle</option><option value="no">Nur gleiche Währung</option><option value="yes">Nur Cross-Currency</option></select></div>
+        <div class="f"><label>Suche</label><input id="f-q" type="text" placeholder="Ticker oder Name"></div>
+        <button class="btn" id="f-reset">Zurücksetzen</button>
+        <div class="count" id="count"></div>
+    </div>
+    <div class="tbl-wrap">
+    <table>
+        <thead><tr id="thead"></tr></thead>
+        <tbody id="tbody"></tbody>
+    </table>
+    </div>
+    <div class="pager" id="pager"></div>
+</div>
+
+<div class="card">
+    <div class="card-title">Methodik &amp; Lesehilfe</div>
+    <details><summary>Wie werden die Paare gebildet?</summary><div class="body">
+        <p>Das Universum umfasst rund 400 Aktien aus DAX/MDAX, Euro Stoxx 50 plus große UK-/Schweizer Titel und den S&amp;P 100 plus Sektorergänzungen, eingeteilt in 25 Sektoren. Paare werden <b>nur innerhalb eines Sektors</b> gebildet – so hat eine gefundene Kointegration einen ökonomischen Grund (gleiche Endmärkte, gleiche Rohstoffe, gleiche Regulierung) und ist weniger wahrscheinlich ein statistischer Zufallstreffer.</p>
+        <p>Cross-Region-Paare (z.&nbsp;B. BMW gegen GM) werden mitgetestet. Bei unterschiedlichen Währungen werden beide Kurse in EUR umgerechnet, damit der Spread nicht nur den Wechselkurs abbildet; solche Paare tragen das Kürzel <span class="fxtag">FX</span>. Beim Handel bleibt dann trotzdem ein Währungsrisiko im Spread – entweder bewusst tragen oder hedgen.</p>
+    </div></details>
+    <details><summary>Korrelation vs. Kointegration – was ist der Unterschied?</summary><div class="body">
+        <p><b>Korrelation</b> (hier: Pearson-Korrelation der täglichen Log-Renditen über 252 Handelstage) sagt, ob sich zwei Aktien <i>von Tag zu Tag</i> ähnlich bewegen. Sie sagt nichts darüber, ob der Abstand zwischen beiden Kursen langfristig stabil bleibt – zwei Aktien können hoch korreliert sein und trotzdem jahrelang auseinanderlaufen.</p>
+        <p><b>Kointegration</b> prüft genau das: Gibt es ein Mischungsverhältnis (Hedge Ratio β), bei dem <code>log(B) − β·log(A)</code> stationär ist, also um einen festen Mittelwert schwankt? Getestet wird mit dem <b>Engle-Granger-Test</b> (statsmodels <code>coint</code>) über 504 Handelstage (~2 Jahre), in beiden Regressionsrichtungen; die bessere wird verwendet. Der <b>p-Wert</b> ist die Wahrscheinlichkeit, einen so stationären Spread auch ohne echte Kointegration zu sehen. Faustregel: p &lt; 0.05 gut, p &lt; 0.01 sehr gut. Bei ~3.300 getesteten Paaren sind rein zufällig ~165 Paare mit p &lt; 0.05 zu erwarten – deshalb zählt die Kombination aller Kennzahlen, nicht der p-Wert allein.</p>
+    </div></details>
+    <details><summary>Z-Score, Half-Life, Hurst, Beta-Drift</summary><div class="body">
+        <p><b>Z-Score</b>: aktueller Spread geteilt durch seine Standardabweichung über das Regressionsfenster. |z| ≥ 2 heißt: der Spread ist ungewöhnlich weit vom Mittel entfernt – das klassische Einstiegssignal. z &gt; 0 bedeutet, Aktie B ist relativ zu A zu teuer → <span class="sh">Short B</span> / <span class="lg">Long A</span>. Bei |z| ≥ 4 steht das Paar auf <span class="st EXTREM">EXTREM</span>: Verdacht auf Strukturbruch (Übernahme, Gewinnwarnung, Indexänderung) – erst Nachrichten prüfen.</p>
+        <p><b>Half-Life</b> (Halbwertszeit): aus einer AR(1)-Regression des Spreads geschätzte Anzahl Handelstage, bis sich eine Abweichung halbiert hat. Ideal für Swing-Pairs sind 5–40 Tage. Unter 5 Tagen frisst der Handel die Bewegung auf, über 60 Tagen bindet die Position zu lange Kapital.</p>
+        <p><b>Hurst-Exponent</b> des Spreads: 0.5 = Random Walk, deutlich unter 0.5 = mean-reverting (gut), über 0.5 = trendend (schlecht für Pairs).</p>
+        <p><b>Beta-Drift</b>: relative Abweichung der Hedge Ratio zwischen erster und zweiter Hälfte des Fensters. Hohe Werte bedeuten eine instabile Beziehung.</p>
+        <p><b>Nulldurchgänge</b>: wie oft der Spread in zwei Jahren das Mittel gekreuzt hat – mehr Durchgänge = mehr Handelsgelegenheiten. <b>Tage seit Nulldurchgang</b>: wie lange die aktuelle Abweichung schon besteht.</p>
+    </div></details>
+    <details><summary>Qualitäts- und Gesamt-Score</summary><div class="body">
+        <p>Der <b>Qualitäts-Score</b> (0–100) bewertet die statistische Eignung des Paares unabhängig vom heutigen Signal: Kointegration bis 35 Punkte (p=0 → 35, p ≥ 0.10 → 0), Korrelation bis 20 (0.30 → 0, 0.90 → 20), Half-Life bis 20 (volle Punkte bei 5–40 Tagen), Beta-Stabilität bis 10, Hurst bis 15 (H ≤ 0.2 → 15, H ≥ 0.5 → 0).</p>
+        <p>Der <b>Gesamt-Score</b> multipliziert die Qualität mit dem Signal <code>min(|z| / 2, 1)</code>. Ein hervorragendes Paar ohne aktuelle Abweichung landet also unten in der Liste – es ist heute schlicht nicht handelbar. Bei |z| ≥ 4 wird der Score um 30 % gekürzt.</p>
+        <p><b>Erw. Bewegung</b>: Spread-Rückkehr zum Mittel in Prozent (|z| × Spread-Standardabweichung) – das theoretische Potenzial des Trades vor Kosten, wenn der Spread vollständig schließt.</p>
+    </div></details>
+    <details><summary>Wie setze ich einen Trade um?</summary><div class="body">
+        <p>Die Hedge Ratio β bezieht sich auf Log-Kurse und entspricht näherungsweise dem <b>Verhältnis der Positionsgrößen in Geld</b>: Für 10.000 € in Aktie A (Long) werden ca. β × 10.000 € in Aktie B (Short) gestellt. Bei β nahe 1 ist der Trade geldneutral.</p>
+        <p>Typische Regeln: Einstieg bei |z| ≥ 2, Ausstieg bei z ≈ 0 (oder ±0.5), Stop bei |z| ≥ 3.5–4 oder nach dem 2- bis 3-fachen der Half-Life ohne Konvergenz. Vor jedem Trade: Nachrichten beider Titel prüfen (Earnings-Termine, Übernahmen, Dividenden-Ex-Tage), Shortbarkeit und Leihkosten klären.</p>
+        <p><b>Keine Anlageberatung.</b> Der Screener zeigt statistische Kandidaten, keine Handelsempfehlungen. Kointegration kann jederzeit brechen (Lucas-Kritik), historische Stationarität garantiert nichts für die Zukunft.</p>
+    </div></details>
+</div>
+
+<div class="footer" id="footer"></div>
+</div>
+
+<script>
+const DATA = /*__DATA__*/;
+const P = DATA.pairs, M = DATA.meta, CFG = M.cfg;
+const fmt = (x, d=2) => (x === null || x === undefined || Number.isNaN(x)) ? '–' : Number(x).toFixed(d);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+document.getElementById('ts').textContent = M.data_date + ' · generiert ' + M.generated;
+document.getElementById('qmin').textContent = CFG.quality_min;
+document.getElementById('zsetup').textContent = CFG.z_setup.toFixed(1);
+document.getElementById('zwatch').textContent = CFG.z_watch.toFixed(1);
+document.getElementById('footer').innerHTML = `Datenquelle: Yahoo Finance (Schlusskurse, dividendenbereinigt) · ${M.n_tickers} von ${M.n_universe} Aktien mit ausreichender Historie · Kointegration: Engle-Granger über ${CFG.coint_window} Handelstage · Korrelation: ${CFG.corr_window} Tage · ${M.fx_ok ? 'Cross-Currency-Paare in EUR umgerechnet' : 'FX-Daten fehlten – Cross-Currency-Paare in Lokalwährung'} · Keine Anlageberatung · <a href="https://www.meine-geldseite.de">meine-geldseite.de</a>`;
+
+// KPIs
+document.getElementById('kpis').innerHTML = [
+    ['Aktien', M.n_tickers, ''], ['Paare getestet', M.n_tested, ''],
+    ['Kointegriert (p<0.05)', M.n_coint, 'b'], ['Setups (|z| ≥ ' + CFG.z_setup + ')', M.n_setup, 'g'], ['Watch', M.n_watch, 'y'],
+].map(([l,v,c]) => `<div class="kpi"><div class="l">${l}</div><div class="v ${c}">${v}</div></div>`).join('');
+
+// Sektor-Filter füllen
+const fs = document.getElementById('f-sector');
+M.sectors.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; fs.appendChild(o); });
+
+function legsHtml(p, big) {
+    return `<span class="lg">Long ${esc(p.long)}</span><span class="sep">/</span><span class="sh">Short ${esc(p.short)}</span>`;
+}
+function zClass(z) { const a = Math.abs(z); return a >= CFG.z_extreme ? 'r' : a >= CFG.z_setup ? 'g' : a >= CFG.z_watch ? 'y' : 'dim'; }
+function pClass(p) { return p < 0.01 ? 'g' : p < 0.05 ? 'y' : 'dim'; }
+function hlClass(h) { return h === null ? 'mut' : (h >= 5 && h <= 40) ? 'g' : h <= 60 ? 'y' : 'r'; }
+function bar(v, max, col) { const w = Math.max(0, Math.min(100, v / max * 100)); return `<span class="bar"><i style="width:${w}%;background:${col}"></i></span>`; }
+
+// Setups
+const setups = P.filter(p => p.status === 'SETUP' || p.status === 'WATCH').sort((a,b) => b.score - a.score).slice(0, 9);
+document.getElementById('setups').innerHTML = setups.length ? setups.map(p => `
+    <div class="setup ${p.status.toLowerCase()}" data-id="${p.id}">
+        <span class="tag">${p.status}</span>
+        <div class="legs">${legsHtml(p)}</div>
+        <div class="names">${esc(p.na)} / ${esc(p.nb)} · ${esc(p.sector)} · ${p.region}${p.fx ? ' <span class="fxtag">FX</span>' : ''}</div>
+        <div class="facts">
+            <div><span>Z-Score</span><b class="${zClass(p.z)}">${fmt(p.z)}</b></div>
+            <div><span>p-Wert</span><b class="${pClass(p.p)}">${fmt(p.p,3)}</b></div>
+            <div><span>Korr.</span><b>${fmt(p.corr)}</b></div>
+            <div><span>Half-Life</span><b class="${hlClass(p.hl)}">${fmt(p.hl,0)}d</b></div>
+            <div><span>Erw. Bew.</span><b>${fmt(p.move,1)}%</b></div>
+            <div><span>Qualität</span><b>${fmt(p.q,0)}</b></div>
+        </div>
+    </div>`).join('') : '<div class="empty">Heute kein Paar mit Qualität ≥ ' + CFG.quality_min + ' und |z| ≥ ' + CFG.z_watch + '. Die Tabelle unten zeigt alle Kandidaten.</div>';
+document.querySelectorAll('.setup').forEach(el => el.addEventListener('click', () => showDetail(+el.dataset.id, true)));
+
+// Tabelle
+const COLS = [
+    {k:'status', l:'Status', cls:'l', r:p => `<span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? '·' : p.status}</span>`, v:p => ({SETUP:3,WATCH:2,EXTREM:1,'-':0})[p.status]},
+    {k:'pair', l:'Paar (Long / Short)', cls:'l', r:p => `<span class="pair">${legsHtml(p)}</span>${p.fx ? '<span class="fxtag">FX</span>' : ''}<span class="sub">${esc(p.na)} / ${esc(p.nb)}</span>`, v:p => p.long + p.short},
+    {k:'sector', l:'Sektor', cls:'l', r:p => `${esc(p.sector)}<span class="sub">${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region}</span>`, v:p => p.sector},
+    {k:'z', l:'Z-Score', r:p => `<span class="${zClass(p.z)}">${fmt(p.z)}</span>`, v:p => Math.abs(p.z)},
+    {k:'dz', l:'Δz 5d', r:p => { const d = p.z5 === null ? null : p.z - p.z5; return `<span class="dim">${d === null ? '–' : (d > 0 ? '+' : '') + fmt(d)}</span>`; }, v:p => p.z5 === null ? 0 : Math.abs(p.z) - Math.abs(p.z5)},
+    {k:'corr', l:'Korr. 1J', r:p => fmt(p.corr), v:p => p.corr},
+    {k:'p', l:'p-Wert', r:p => `<span class="${pClass(p.p)}">${fmt(p.p,4)}</span>`, v:p => -p.p},
+    {k:'beta', l:'β', r:p => fmt(p.beta), v:p => p.beta},
+    {k:'hl', l:'Half-Life', r:p => `<span class="${hlClass(p.hl)}">${p.hl === null ? '∞' : fmt(p.hl,0) + 'd'}</span>`, v:p => p.hl === null ? -1e9 : -p.hl},
+    {k:'hurst', l:'Hurst', r:p => fmt(p.hurst), v:p => p.hurst === null ? 0 : -p.hurst},
+    {k:'zc', l:'Nulldg.', r:p => p.zc, v:p => p.zc},
+    {k:'dsc', l:'Tage ab Ø', r:p => `<span class="dim">${p.dsc}</span>`, v:p => -p.dsc},
+    {k:'move', l:'Erw. Bew.', r:p => fmt(p.move,1) + '%', v:p => p.move},
+    {k:'q', l:'Qualität', r:p => `${fmt(p.q,0)}${bar(p.q,100,'var(--blue)')}`, v:p => p.q},
+    {k:'score', l:'Score', r:p => `<b>${fmt(p.score,0)}</b>${bar(p.score,100,'var(--green)')}`, v:p => p.score},
+];
+let sortKey = 'score', sortDir = -1, page = 0, PAGE = 50, filtered = [];
+document.getElementById('thead').innerHTML = COLS.map(c => `<th class="${c.cls||''}" data-k="${c.k}">${c.l}</th>`).join('');
+document.querySelectorAll('th').forEach(th => th.addEventListener('click', () => {
+    const k = th.dataset.k; if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = -1; } page = 0; render();
+}));
+
+const F = id => document.getElementById(id);
+['f-region','f-sector','f-status','f-corr','f-p','f-z','f-hl','f-fx','f-q'].forEach(id => F(id).addEventListener('input', () => { page = 0; render(); }));
+F('f-reset').addEventListener('click', () => { F('f-region').value=''; F('f-sector').value=''; F('f-status').value=''; F('f-corr').value=0.5; F('f-p').value=0.05; F('f-z').value=0; F('f-hl').value=60; F('f-fx').value=''; F('f-q').value=''; page=0; render(); });
+
+function render() {
+    const reg = F('f-region').value, sec = F('f-sector').value, st = F('f-status').value.split(',').filter(Boolean),
+        minC = parseFloat(F('f-corr').value) || 0, maxP = parseFloat(F('f-p').value) || 1, minZ = parseFloat(F('f-z').value) || 0,
+        maxHL = parseFloat(F('f-hl').value) || 1e9, fx = F('f-fx').value, q = F('f-q').value.trim().toLowerCase();
+    filtered = P.filter(p => (!reg || p.region === reg) && (!sec || p.sector === sec) && (!st.length || st.includes(p.status))
+        && p.corr >= minC && p.p <= maxP && Math.abs(p.z) >= minZ && (p.hl !== null && p.hl <= maxHL)
+        && (!fx || (fx === 'yes') === p.fx)
+        && (!q || [p.a,p.b,p.na,p.nb].some(s => s.toLowerCase().includes(q))));
+    const col = COLS.find(c => c.k === sortKey);
+    filtered.sort((x,y) => { const a = col.v(x), b = col.v(y); return (a < b ? -1 : a > b ? 1 : 0) * -sortDir; });
+    document.querySelectorAll('th').forEach(th => th.classList.toggle('sorted', th.dataset.k === sortKey));
+    F('count').textContent = filtered.length + ' von ' + P.length + ' Paaren';
+    const pages = Math.max(1, Math.ceil(filtered.length / PAGE)); page = Math.min(page, pages - 1);
+    const slice = filtered.slice(page * PAGE, (page + 1) * PAGE);
+    F('tbody').innerHTML = slice.map(p => `<tr class="row ${p.id === selId ? 'sel' : ''}" data-id="${p.id}">${COLS.map(c => `<td class="${c.cls||''}">${c.r(p)}</td>`).join('')}</tr>`).join('')
+        || `<tr><td colspan="${COLS.length}" class="l mut">Keine Paare für diese Filter.</td></tr>`;
+    document.querySelectorAll('tr.row').forEach(tr => tr.addEventListener('click', () => showDetail(+tr.dataset.id, false)));
+    F('pager').innerHTML = pages > 1 ? `<button class="btn" ${page===0?'disabled':''} id="pg-prev">‹</button><span>Seite ${page+1} / ${pages}</span><button class="btn" ${page>=pages-1?'disabled':''} id="pg-next">›</button>` : '';
+    if (pages > 1) { F('pg-prev').onclick = () => { page--; render(); }; F('pg-next').onclick = () => { page++; render(); }; }
+}
+
+// Detail
+let selId = null, chZ = null, chPx = null;
+const HAS_CHART = typeof Chart !== 'undefined';
+if (HAS_CHART) { Chart.defaults.color = '#94a3b8'; Chart.defaults.borderColor = '#1f2a3e'; Chart.defaults.font.family = "'JetBrains Mono', monospace"; Chart.defaults.font.size = 11; }
+function showDetail(id, scroll) {
+    const p = P[id]; if (!p) return; selId = id;
+    document.querySelectorAll('tr.row').forEach(tr => tr.classList.toggle('sel', +tr.dataset.id === id));
+    const d = F('detail'); d.classList.add('open');
+    F('d-title').innerHTML = `<span class="lg">Long ${esc(p.long)}</span> <span class="mut">/</span> <span class="sh">Short ${esc(p.short)}</span>`;
+    const nl = p.long === p.a ? p.na : p.nb, ns = p.short === p.a ? p.na : p.nb;
+    F('d-meta').textContent = `${nl} / ${ns} · ${p.sector} · ${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region} · ${p.ca === p.cb ? p.ca : p.ca + ' / ' + p.cb + ' (Spread in EUR)'} · ${p.n} gemeinsame Handelstage · Stand ${p.last}`;
+    const ratio = p.long === p.a ? p.beta : 1 / p.beta;  // Geld in Short pro 1 Geld in Long
+    F('d-trade').innerHTML = `<b>Trade-Idee:</b> Spread ${p.z > 0 ? 'über' : 'unter'} dem Mittel (z = <b class="${zClass(p.z)}">${fmt(p.z)}</b>). Für 10.000 € Long <b>${esc(p.long)}</b> ca. <b>${fmt(ratio*10000,0)} €</b> Short <b>${esc(p.short)}</b> (Hedge Ratio β = ${fmt(p.beta,3)} für ${esc(p.b)} ~ ${esc(p.a)}). Erwartete Spread-Bewegung bis zum Mittel: <b>${fmt(p.move,1)}%</b>. Status: <span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? 'kein Signal' : p.status}</span>${Math.abs(p.z) >= CFG.z_extreme ? ' – <span class="r">Strukturbruch prüfen!</span>' : ''}`;
+    F('d-facts').innerHTML = [
+        ['Z-Score', fmt(p.z), 'vor 5d ' + fmt(p.z5) + ' · vor 20d ' + fmt(p.z20), zClass(p.z)],
+        ['p-Wert (EG)', fmt(p.p,4), p.p < 0.01 ? 'sehr stark' : p.p < 0.05 ? 'kointegriert' : 'schwach', pClass(p.p)],
+        ['Korrelation 1J', fmt(p.corr), '2J: ' + fmt(p.corr_full), ''],
+        ['Half-Life', p.hl === null ? '∞' : fmt(p.hl,1) + ' d', 'Nulldurchgänge: ' + p.zc, hlClass(p.hl)],
+        ['Hurst', fmt(p.hurst), p.hurst < 0.4 ? 'mean-reverting' : p.hurst < 0.5 ? 'leicht mean-rev.' : 'trendend', p.hurst < 0.4 ? 'g' : p.hurst < 0.5 ? 'y' : 'r'],
+        ['Beta-Drift', fmt(p.drift), p.drift < 0.15 ? 'stabil' : p.drift < 0.35 ? 'mäßig' : 'instabil', p.drift < 0.15 ? 'g' : p.drift < 0.35 ? 'y' : 'r'],
+        ['Spread-Vola p.a.', fmt(p.svol,1) + '%', 'Tage seit Ø: ' + p.dsc, ''],
+        ['Qualität / Score', fmt(p.q,0) + ' / ' + fmt(p.score,0), 'von 100', ''],
+    ].map(([l,v,s,c]) => `<div class="fact"><div class="l">${l}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`).join('');
+
+    const s = p.series;
+    const hasS = !!s;
+    F('d-legend').innerHTML = hasS ? `<span><i style="background:#60a5fa"></i>${esc(p.a)} (${esc(p.na)})</span><span><i style="background:#fbbf24"></i>${esc(p.b)} (${esc(p.nb)})</span>` : '';
+    if (chZ) { chZ.destroy(); chZ = null; } if (chPx) { chPx.destroy(); chPx = null; }
+    if (!HAS_CHART) {
+        F('d-legend').innerHTML = '<span class="mut">Chart-Bibliothek konnte nicht geladen werden (CDN blockiert?). Kennzahlen oben bleiben gültig.</span>';
+    } else if (!hasS) {
+        F('d-legend').innerHTML = '<span class="mut">Für dieses Paar sind keine Chart-Serien gespeichert (nur Top-Paare erhalten Serien).</span>';
+    } else {
+        const labels = s.dates.map(x => x.slice(5));
+        const line = (v, c) => ({ data: v, borderColor: c, borderWidth: 1, pointRadius: 0, borderDash: [4,4] });
+        chZ = new Chart(F('c-z'), { type: 'line', data: { labels, datasets: [
+            { label: 'Z-Score', data: s.z, borderColor: '#e2e8f0', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+            { label: '+2', ...line(s.z.map(() => 2), '#ef4444') }, { label: '−2', ...line(s.z.map(() => -2), '#ef4444') },
+            { label: '0', ...line(s.z.map(() => 0), '#64748b') },
+        ]}, options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { display: false }, tooltip: { filter: i => i.datasetIndex === 0, callbacks: { title: it => s.dates[it[0].dataIndex], label: it => 'z = ' + fmt(it.raw) } } },
+            scales: { x: { ticks: { maxTicksLimit: 8, maxRotation: 0 }, grid: { display: false } }, y: { suggestedMin: -3, suggestedMax: 3, grid: { color: '#1f2a3e' } } } } });
+        chPx = new Chart(F('c-px'), { type: 'line', data: { labels, datasets: [
+            { label: p.a, data: s.pa, borderColor: '#60a5fa', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+            { label: p.b, data: s.pb, borderColor: '#fbbf24', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+        ]}, options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { display: false }, tooltip: { callbacks: { title: it => s.dates[it[0].dataIndex], label: it => it.dataset.label + ': ' + fmt(it.raw, 1) } } },
+            scales: { x: { ticks: { maxTicksLimit: 8, maxRotation: 0 }, grid: { display: false } }, y: { grid: { color: '#1f2a3e' } } } } });
+    }
+    if (scroll) d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+render();
+if (setups.length) showDetail(setups[0].id, false); else if (P.length) showDetail(P[0].id, false);
+</script>
+</body>
+</html>
