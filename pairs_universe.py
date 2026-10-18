@@ -11,6 +11,7 @@ Ticker-Format: Yahoo Finance.
   .HE  Helsinki (EUR)       .VI Wien (EUR)       .LS Lissabon (EUR)
   .SW  Zürich (CHF)         .L  London (GBp)     .CO Kopenhagen (DKK)
   ohne Suffix: USA (USD)
+  =F   fortlaufender Front-Month-Future (CME/ICE), ^  Kassa-Index
 """
 
 # sector -> [(ticker, name), ...]
@@ -187,7 +188,72 @@ UNIVERSE = {
     ],
 }
 
+# --------------------------------------------------------------------------- #
+# Rohstoff-Futures, Index-Futures und Kassa-Indizes
+# (ticker, name, währung, kontrakt-multiplikator)
+#
+# Yahoo liefert für US-Futures den fortlaufenden Front-Month-Kontrakt ("=F").
+# Für europäische/asiatische Indizes gibt es bei Yahoo keine Futures, daher
+# der Kassa-Index; der Multiplikator ist der des zugehörigen Index-Futures
+# (FDAX 25 EUR, FESX 10 EUR, FTSE 10 GBP, FSMI 10 CHF, Nikkei OSE 1000 JPY ...).
+# Multiplikator = Kontraktwert pro 1.0 Preiseinheit in der Notierung von Yahoo
+# (ZC=F notiert in US-Cent je Bushel, 5.000 bu  -> 50 USD je Cent).
+# --------------------------------------------------------------------------- #
+FUTURES = {
+    "Energie-Futures": [
+        ("CL=F", "WTI Rohöl", "USD", 1000), ("BZ=F", "Brent Rohöl", "USD", 1000),
+        ("NG=F", "Erdgas Henry Hub", "USD", 10000), ("HO=F", "Heizöl", "USD", 42000),
+        ("RB=F", "Benzin RBOB", "USD", 42000),
+    ],
+    "Metall-Futures": [
+        ("GC=F", "Gold", "USD", 100), ("SI=F", "Silber", "USD", 5000), ("PL=F", "Platin", "USD", 50),
+        ("PA=F", "Palladium", "USD", 100), ("HG=F", "Kupfer", "USD", 25000), ("ALI=F", "Aluminium", "USD", 25),
+    ],
+    "Agrar-Futures": [
+        ("ZC=F", "Mais", "USD", 50), ("ZS=F", "Sojabohnen", "USD", 50), ("ZW=F", "Weizen Chicago", "USD", 50),
+        ("KE=F", "Weizen Kansas", "USD", 50), ("ZO=F", "Hafer", "USD", 50), ("ZM=F", "Sojamehl", "USD", 100),
+        ("ZL=F", "Sojaöl", "USD", 600), ("KC=F", "Kaffee Arabica", "USD", 375), ("CC=F", "Kakao", "USD", 10),
+        ("SB=F", "Zucker Nr. 11", "USD", 1120), ("CT=F", "Baumwolle", "USD", 500), ("OJ=F", "Orangensaft", "USD", 150),
+        ("LE=F", "Lebendrind", "USD", 400), ("HE=F", "Mastschwein", "USD", 400), ("GF=F", "Mastrind", "USD", 500),
+    ],
+    "Index-Futures & Indizes": [
+        ("ES=F", "S&P 500 E-mini", "USD", 50), ("NQ=F", "Nasdaq 100 E-mini", "USD", 20),
+        ("YM=F", "Dow Jones E-mini", "USD", 5), ("RTY=F", "Russell 2000 E-mini", "USD", 50),
+        ("NKD=F", "Nikkei 225 (CME, USD)", "USD", 5),
+        ("^GDAXI", "DAX (Kasse / FDAX)", "EUR", 25), ("^MDAXI", "MDAX (Kasse)", "EUR", 5),
+        ("^STOXX50E", "Euro Stoxx 50 (Kasse / FESX)", "EUR", 10), ("^STOXX", "Stoxx Europe 600 (Kasse)", "EUR", 50),
+        ("^FTSE", "FTSE 100 (Kasse / Z)", "GBP", 10), ("^FCHI", "CAC 40 (Kasse / FCE)", "EUR", 10),
+        ("^IBEX", "IBEX 35 (Kasse)", "EUR", 10), ("^FTSEMIB", "FTSE MIB (Kasse)", "EUR", 5),
+        ("^AEX", "AEX (Kasse)", "EUR", 200), ("^SSMI", "SMI (Kasse / FSMI)", "CHF", 10),
+        ("^N225", "Nikkei 225 (Kasse)", "JPY", 1000), ("^HSI", "Hang Seng (Kasse)", "HKD", 50),
+    ],
+}
+
+# Anlageklasse, Währung, Region und Multiplikator je Nicht-Aktien-Ticker
+META = {}
+for _sector, _members in FUTURES.items():
+    for _t, _n, _cur, _mult in _members:
+        if _sector.startswith("Index"):
+            _asset = "Index"
+            _region = ("US" if _t.endswith("=F") else "DE" if _t in ("^GDAXI", "^MDAXI")
+                       else "Asien" if _t in ("^N225", "^HSI") else "EU")
+        else:
+            _asset, _region = "Rohstoff", "Global"
+        META[_t] = {"cur": _cur, "mult": _mult, "asset": _asset, "region": _region}
+    UNIVERSE[_sector] = [(_t, _n) for _t, _n, _, _ in _members]
+
+
+def asset_of(ticker: str) -> str:
+    return META.get(ticker, {}).get("asset", "Aktie")
+
+
+def multiplier_of(ticker: str):
+    return META.get(ticker, {}).get("mult")
+
+
 def currency_of(ticker: str) -> str:
+    if ticker in META:
+        return META[ticker]["cur"]
     if ticker.endswith(".SW"):
         return "CHF"
     if ticker.endswith(".L"):
@@ -201,6 +267,8 @@ def currency_of(ticker: str) -> str:
 
 
 def region_of(ticker: str) -> str:
+    if ticker in META:
+        return META[ticker]["region"]
     if ticker.endswith(".DE"):
         return "DE"
     if "." in ticker:
@@ -219,4 +287,5 @@ def all_tickers():
 
 
 # FX-Paare (Yahoo) zur Umrechnung in EUR: Preis_EUR = Preis_lokal / Kurs(EURXXX)
-FX_TICKERS = {"USD": "EURUSD=X", "CHF": "EURCHF=X", "GBp": "EURGBP=X", "DKK": "EURDKK=X"}
+FX_TICKERS = {"USD": "EURUSD=X", "CHF": "EURCHF=X", "GBp": "EURGBP=X", "GBP": "EURGBP=X",
+              "DKK": "EURDKK=X", "JPY": "EURJPY=X", "HKD": "EURHKD=X"}

@@ -2,7 +2,8 @@
 """
 Pairs-Trading-Screener (US / Europa / Deutschland)
 
-Testet alle Aktienpaare innerhalb eines Sektors auf Korrelation, Kointegration
+Testet alle Paare innerhalb eines Sektors (Aktien, Rohstoff-Futures, Index-Futures/
+Indizes) auf Korrelation, Kointegration
 (Engle-Granger), Mean-Reversion-Geschwindigkeit (Half-Life), Hurst-Exponent und
 den aktuellen Spread-Z-Score. Erzeugt `pairs_data.json` und das Dashboard
 `pairs.html`.
@@ -28,7 +29,7 @@ import pandas as pd
 
 warnings.filterwarnings("ignore")
 
-from pairs_universe import UNIVERSE, FX_TICKERS, all_tickers, currency_of, region_of  # noqa: E402
+from pairs_universe import UNIVERSE, FX_TICKERS, all_tickers, currency_of, region_of, asset_of, multiplier_of  # noqa: E402
 
 # --------------------------------------------------------------------------- #
 # Konfiguration
@@ -110,7 +111,7 @@ def load_prices(tickers, offline, cache_dir):
     if not offline:
         log("Lade Kurse von Yahoo Finance ...")
         px = download_yahoo(tickers, start)
-        fx = download_yahoo(list(FX_TICKERS.values()), start)
+        fx = download_yahoo(sorted(set(FX_TICKERS.values())), start)
 
     if not cache_px.empty:
         px = cache_px if px.empty else px.combine_first(cache_px)
@@ -364,6 +365,9 @@ def main():
             r["region_a"], r["region_b"] = ra, rb
             r["cur_a"], r["cur_b"] = currency_of(r["a"]), currency_of(r["b"])
             r["name_a"], r["name_b"] = names.get(r["a"], r["a"]), names.get(r["b"], r["b"])
+            r["asset"] = asset_of(r["a"])
+            r["mult_a"], r["mult_b"] = multiplier_of(r["a"]), multiplier_of(r["b"])
+            r["last_a"], r["last_b"] = float(px[r["a"]].dropna().iloc[-1]), float(px[r["b"]].dropna().iloc[-1])
             results.append(r)
         log(f"  {sector}: {len(avail)} Aktien, {n_pairs} Paare getestet")
 
@@ -396,6 +400,7 @@ def main():
             "drift": fnum(r["beta_drift"], 3), "z": fnum(r["z"], 2), "z5": fnum(r["z5"], 2), "z20": fnum(r["z20"], 2),
             "move": fnum(r["exp_move_pct"], 1), "q": fnum(r["quality"], 1), "score": fnum(r["score"], 1),
             "status": r["status"], "long": r["long"], "short": r["short"], "n": r["n"], "last": r["last_date"],
+            "asset": r["asset"], "ma": r["mult_a"], "mb": r["mult_b"], "pxa": fnum(r["last_a"], 2), "pxb": fnum(r["last_b"], 2),
         }
         if id(r) in with_series:
             zs = r["_z_series"]
@@ -409,7 +414,7 @@ def main():
         pairs_json.append(d)
 
     universe_json = [{"t": t, "name": names[t], "sector": s, "region": region_of(t), "cur": currency_of(t),
-                      "ok": t in px.columns}
+                      "asset": asset_of(t), "ok": t in px.columns}
                      for s, members in UNIVERSE.items() for t, _ in members]
 
     meta = {

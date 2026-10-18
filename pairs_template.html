@@ -136,7 +136,7 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
 <div class="header">
     <div class="title-block">
         <h1>Pairs-Trading-Screener</h1>
-        <div class="subtitle">Korrelation · Kointegration · Spread-Z-Score · US / Europa / Deutschland</div>
+        <div class="subtitle">Korrelation · Kointegration · Spread-Z-Score · Aktien US / Europa / Deutschland · Rohstoff- &amp; Index-Futures</div>
         <div class="author">Thomas Bleeß · <a href="https://www.meine-geldseite.de" target="_blank" rel="noopener">meine-geldseite.de</a></div>
     </div>
     <div class="timestamp">
@@ -177,7 +177,8 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
 <div class="card">
     <div class="card-title"><span>Alle Paare</span><span class="hint">Sortierbar per Klick auf die Spalte · Standard: Gesamt-Score (Qualität × Signal)</span></div>
     <div class="filters">
-        <div class="f"><label>Region</label><select id="f-region"><option value="">Alle</option><option value="DE">Deutschland</option><option value="EU">Europa</option><option value="US">USA</option><option value="Cross">Cross-Region</option></select></div>
+        <div class="f"><label>Anlageklasse</label><select id="f-asset"><option value="">Alle</option><option value="Aktie">Aktien</option><option value="Rohstoff">Rohstoff-Futures</option><option value="Index">Index-Futures / Indizes</option></select></div>
+        <div class="f"><label>Region</label><select id="f-region"><option value="">Alle</option><option value="DE">Deutschland</option><option value="EU">Europa</option><option value="US">USA</option><option value="Asien">Asien</option><option value="Global">Global (Rohstoffe)</option><option value="Cross">Cross-Region</option></select></div>
         <div class="f"><label>Sektor</label><select id="f-sector"><option value="">Alle</option></select></div>
         <div class="f"><label>Status</label><select id="f-status"><option value="">Alle</option><option value="SETUP">Setup</option><option value="WATCH">Watch</option><option value="SETUP,WATCH">Setup + Watch</option><option value="EXTREM">Extrem</option></select></div>
         <div class="f"><label>Min. Korr.</label><input id="f-corr" type="number" step="0.05" min="0" max="1" value="0.5"></div>
@@ -201,7 +202,7 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
 <div class="card">
     <div class="card-title">Methodik &amp; Lesehilfe</div>
     <details><summary>Wie werden die Paare gebildet?</summary><div class="body">
-        <p>Das Universum umfasst rund 400 Aktien aus DAX/MDAX, Euro Stoxx 50 plus große UK-/Schweizer Titel und den S&amp;P 100 plus Sektorergänzungen, eingeteilt in 25 Sektoren. Paare werden <b>nur innerhalb eines Sektors</b> gebildet – so hat eine gefundene Kointegration einen ökonomischen Grund (gleiche Endmärkte, gleiche Rohstoffe, gleiche Regulierung) und ist weniger wahrscheinlich ein statistischer Zufallstreffer.</p>
+        <p>Das Universum umfasst rund 400 Aktien aus DAX/MDAX, Euro Stoxx 50 plus große UK-/Schweizer Titel und den S&amp;P 100 plus Sektorergänzungen, eingeteilt in 25 Sektoren, sowie 26 Rohstoff-Futures (Energie, Metalle, Agrar) und 17 Index-Futures bzw. Kassa-Indizes. Paare werden <b>nur innerhalb eines Sektors</b> gebildet – so hat eine gefundene Kointegration einen ökonomischen Grund (gleiche Endmärkte, gleiche Rohstoffe, gleiche Regulierung) und ist weniger wahrscheinlich ein statistischer Zufallstreffer.</p>
         <p>Cross-Region-Paare (z.&nbsp;B. BMW gegen GM) werden mitgetestet. Bei unterschiedlichen Währungen werden beide Kurse in EUR umgerechnet, damit der Spread nicht nur den Wechselkurs abbildet; solche Paare tragen das Kürzel <span class="fxtag">FX</span>. Beim Handel bleibt dann trotzdem ein Währungsrisiko im Spread – entweder bewusst tragen oder hedgen.</p>
     </div></details>
     <details><summary>Korrelation vs. Kointegration – was ist der Unterschied?</summary><div class="body">
@@ -219,6 +220,12 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
         <p>Der <b>Qualitäts-Score</b> (0–100) bewertet die statistische Eignung des Paares unabhängig vom heutigen Signal: Kointegration bis 35 Punkte (p=0 → 35, p ≥ 0.10 → 0), Korrelation bis 20 (0.30 → 0, 0.90 → 20), Half-Life bis 20 (volle Punkte bei 5–40 Tagen), Beta-Stabilität bis 10, Hurst bis 15 (H ≤ 0.2 → 15, H ≥ 0.5 → 0).</p>
         <p>Der <b>Gesamt-Score</b> multipliziert die Qualität mit dem Signal <code>min(|z| / 2, 1)</code>. Ein hervorragendes Paar ohne aktuelle Abweichung landet also unten in der Liste – es ist heute schlicht nicht handelbar. Bei |z| ≥ 4 wird der Score um 30 % gekürzt.</p>
         <p><b>Erw. Bewegung</b>: Spread-Rückkehr zum Mittel in Prozent (|z| × Spread-Standardabweichung) – das theoretische Potenzial des Trades vor Kosten, wenn der Spread vollständig schließt.</p>
+    </div></details>
+    <details><summary>Rohstoff- und Index-Futures: Besonderheiten</summary><div class="body">
+        <p><b>Datenbasis:</b> Für US-Futures liefert Yahoo Finance den <b>fortlaufenden Front-Month-Kontrakt</b> (Ticker mit <code>=F</code>). Die Serie ist <i>nicht</i> roll-adjustiert: Beim Kontraktwechsel entsteht ein Sprung in Höhe des Contango bzw. der Backwardation. Bei Paaren mit ähnlicher Terminkurve (WTI/Brent, Gold/Silber, ES/NQ) hebt sich das weitgehend auf, bei stark unterschiedlichen Kurven (z.&nbsp;B. Erdgas gegen Heizöl) kann der Roll den Spread verzerren – Z-Scores dort mit Vorsicht lesen.</p>
+        <p><b>Europäische und asiatische Indizes</b> (DAX, Euro Stoxx 50, FTSE 100, SMI, Nikkei, Hang Seng) gibt es bei Yahoo nicht als Future, deshalb wird der <b>Kassa-Index</b> verwendet. Die Kointegrationsstatistik ist praktisch identisch mit der des Futures (Basis und Dividenden sind klein gegenüber der Spread-Volatilität); gehandelt wird dann über den zugehörigen Future (FDAX, FESX, Z, FSMI …), dessen Multiplikator im Universum hinterlegt ist.</p>
+        <p><b>Positionsgröße:</b> Die Hedge Ratio β bezieht sich auf das <b>Notional</b> (Kontraktwert = Preis × Multiplikator), nicht auf die Kontraktzahl. Die Detailansicht rechnet das für den aktuellen Kurs um: 1 Kontrakt Long → x Kontrakte Short. Da Kontrakte nicht teilbar sind, wird gerundet – Micro-Kontrakte (MES, MNQ, MGC, MCL …) erlauben feinere Verhältnisse. Bei Cross-Currency-Paaren (ES vs. DAX) kommt das Währungsrisiko hinzu.</p>
+        <p><b>Handelszeiten:</b> Futures handeln fast rund um die Uhr, Kassa-Indizes nur während der Börsenzeit. Die Tagesschlusskurse stammen deshalb von unterschiedlichen Zeitpunkten, was die gemessene Korrelation zwischen US-Futures und europäischen Indizes nach unten verzerrt. Die Kointegration über Wochen und Monate ist davon kaum betroffen.</p>
     </div></details>
     <details><summary>Wie setze ich einen Trade um?</summary><div class="body">
         <p>Die Hedge Ratio β bezieht sich auf Log-Kurse und entspricht näherungsweise dem <b>Verhältnis der Positionsgrößen in Geld</b>: Für 10.000 € in Aktie A (Long) werden ca. β × 10.000 € in Aktie B (Short) gestellt. Bei β nahe 1 ist der Trade geldneutral.</p>
@@ -303,14 +310,14 @@ document.querySelectorAll('th').forEach(th => th.addEventListener('click', () =>
 }));
 
 const F = id => document.getElementById(id);
-['f-region','f-sector','f-status','f-corr','f-p','f-z','f-hl','f-fx','f-q'].forEach(id => F(id).addEventListener('input', () => { page = 0; render(); }));
-F('f-reset').addEventListener('click', () => { F('f-region').value=''; F('f-sector').value=''; F('f-status').value=''; F('f-corr').value=0.5; F('f-p').value=0.05; F('f-z').value=0; F('f-hl').value=60; F('f-fx').value=''; F('f-q').value=''; page=0; render(); });
+['f-asset','f-region','f-sector','f-status','f-corr','f-p','f-z','f-hl','f-fx','f-q'].forEach(id => F(id).addEventListener('input', () => { page = 0; render(); }));
+F('f-reset').addEventListener('click', () => { F('f-asset').value=''; F('f-region').value=''; F('f-sector').value=''; F('f-status').value=''; F('f-corr').value=0.5; F('f-p').value=0.05; F('f-z').value=0; F('f-hl').value=60; F('f-fx').value=''; F('f-q').value=''; page=0; render(); });
 
 function render() {
-    const reg = F('f-region').value, sec = F('f-sector').value, st = F('f-status').value.split(',').filter(Boolean),
+    const asset = F('f-asset').value, reg = F('f-region').value, sec = F('f-sector').value, st = F('f-status').value.split(',').filter(Boolean),
         minC = parseFloat(F('f-corr').value) || 0, maxP = parseFloat(F('f-p').value) || 1, minZ = parseFloat(F('f-z').value) || 0,
         maxHL = parseFloat(F('f-hl').value) || 1e9, fx = F('f-fx').value, q = F('f-q').value.trim().toLowerCase();
-    filtered = P.filter(p => (!reg || p.region === reg) && (!sec || p.sector === sec) && (!st.length || st.includes(p.status))
+    filtered = P.filter(p => (!asset || p.asset === asset) && (!reg || p.region === reg) && (!sec || p.sector === sec) && (!st.length || st.includes(p.status))
         && p.corr >= minC && p.p <= maxP && Math.abs(p.z) >= minZ && (p.hl !== null && p.hl <= maxHL)
         && (!fx || (fx === 'yes') === p.fx)
         && (!q || [p.a,p.b,p.na,p.nb].some(s => s.toLowerCase().includes(q))));
@@ -338,9 +345,21 @@ function showDetail(id, scroll) {
     F('d-title').innerHTML = `<span class="lg">Long ${esc(p.long)}</span> <span class="mut">/</span> <span class="sh">Short ${esc(p.short)}</span>`;
     const nl = p.long === p.a ? p.na : p.nb, ns = p.short === p.a ? p.na : p.nb;
     F('d-meta').textContent = `${nl} / ${ns} · ${p.sector} · ${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region} · ${p.ca === p.cb ? p.ca : p.ca + ' / ' + p.cb + ' (Spread in EUR)'} · ${p.n} gemeinsame Handelstage · Stand ${p.last}`;
-    const ratio = p.long === p.a ? p.beta : 1 / p.beta;  // Geld in Short pro 1 Geld in Long
+    const ratio = p.long === p.a ? p.beta : 1 / p.beta;  // Notional Short pro 1 Notional Long
     const cur = p.ca === p.cb ? (p.ca === 'GBp' ? 'GBP' : p.ca) : 'EUR';
-    F('d-trade').innerHTML = `<b>Trade-Idee:</b> Spread ${p.z > 0 ? 'über' : 'unter'} dem Mittel (z = <b class="${zClass(p.z)}">${fmt(p.z)}</b>). Für 10.000 ${cur} Long <b>${esc(p.long)}</b> ca. <b>${fmt(ratio*10000,0)} ${cur}</b> Short <b>${esc(p.short)}</b> (Hedge Ratio β = ${fmt(p.beta,3)} für ${esc(p.b)} ~ ${esc(p.a)}). Erwartete Spread-Bewegung bis zum Mittel: <b>${fmt(p.move,1)}%</b>. Status: <span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? 'kein Signal' : p.status}</span>${Math.abs(p.z) >= CFG.z_extreme ? ' – <span class="r">Strukturbruch prüfen!</span>' : ''}`;
+    let sizing;
+    if (p.asset !== 'Aktie' && p.ma && p.mb) {
+        const mL = p.long === p.a ? p.ma : p.mb, mS = p.long === p.a ? p.mb : p.ma;
+        const pxL = p.long === p.a ? p.pxa : p.pxb, pxS = p.long === p.a ? p.pxb : p.pxa;
+        const cL = p.long === p.a ? p.ca : p.cb, cS = p.long === p.a ? p.cb : p.ca;
+        const notL = mL * pxL, notS = mS * pxS;
+        // Kontraktzahl Short je 1 Kontrakt Long; bei Fremdwährung Notionals grob über das Verhältnis der Notionals in Lokalwährung
+        const nShort = notL * ratio / notS;
+        sizing = `Für <b>1 Kontrakt Long ${esc(p.long)}</b> (Notional ≈ ${fmt(notL,0)} ${cL}, Multiplikator ${mL}) ca. <b>${fmt(nShort,2)} Kontrakte Short ${esc(p.short)}</b> (Notional ≈ ${fmt(notS,0)} ${cS} je Kontrakt)${cL !== cS ? ' – unterschiedliche Währungen, Notionals vor dem Trade in eine Währung umrechnen' : ''}.`;
+    } else {
+        sizing = `Für 10.000 ${cur} Long <b>${esc(p.long)}</b> ca. <b>${fmt(ratio*10000,0)} ${cur}</b> Short <b>${esc(p.short)}</b>.`;
+    }
+    F('d-trade').innerHTML = `<b>Trade-Idee:</b> Spread ${p.z > 0 ? 'über' : 'unter'} dem Mittel (z = <b class="${zClass(p.z)}">${fmt(p.z)}</b>). ${sizing} Hedge Ratio β = ${fmt(p.beta,3)} für ${esc(p.b)} ~ ${esc(p.a)}. Erwartete Spread-Bewegung bis zum Mittel: <b>${fmt(p.move,1)}%</b>. Status: <span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? 'kein Signal' : p.status}</span>${Math.abs(p.z) >= CFG.z_extreme ? ' – <span class="r">Strukturbruch prüfen!</span>' : ''}`;
     F('d-facts').innerHTML = [
         ['Z-Score', fmt(p.z), 'vor 5d ' + fmt(p.z5) + ' · vor 20d ' + fmt(p.z20), zClass(p.z)],
         ['p-Wert (EG)', fmt(p.p,4), p.p < 0.01 ? 'sehr stark' : p.p < 0.05 ? 'kointegriert' : 'schwach', pClass(p.p)],
