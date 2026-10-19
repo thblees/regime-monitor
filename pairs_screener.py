@@ -47,8 +47,17 @@ CFG = {
     "beta_range": (0.2, 5.0),  # Hedge Ratios außerhalb sind keine sinnvollen Paare (β≈0: Spread = Einzelaktie)
     "z_setup": 2.0,            # |z| ab dem ein Paar als SETUP gilt
     "z_watch": 1.5,            # |z| ab dem ein Paar auf WATCH steht
-    "quality_min": 55,         # Mindest-Qualitätsscore für SETUP/WATCH
-    "status_min_corr": 0.40,   # Mindest-Renditekorrelation (1J) für SETUP/WATCH
+    # Strenge Kriterien: nur "saubere" Paare werden SETUP/WATCH (und standardmäßig in der Tabelle gezeigt)
+    "strict": {
+        "max_p": 0.05,         # Engle-Granger p-Wert
+        "min_corr": 0.60,      # Renditekorrelation 1 Jahr
+        "beta_min": 0.75,      # Hedge Ratio nahe 1 (symmetrisch in Log: 1/1.35 ≈ 0.75)
+        "beta_max": 1.35,
+        "max_drift": 0.20,     # Beta-Stabilität erste vs. zweite Hälfte
+        "hl_min": 3, "hl_max": 40,   # Half-Life in Handelstagen
+        "max_hurst": 0.50,     # Spread muss mean-reverting sein
+        "min_quality": 60,
+    },
     "z_extreme": 4.0,          # ab hier Verdacht auf Strukturbruch
 }
 
@@ -305,7 +314,10 @@ def analyze_pair(a, b, pa, pb):
     if abs(z_now) >= CFG["z_extreme"]:
         total *= 0.7
 
-    eligible = q >= CFG["quality_min"] and corr >= CFG["status_min_corr"]
+    st = CFG["strict"]
+    eligible = (p <= st["max_p"] and corr >= st["min_corr"] and st["beta_min"] <= beta <= st["beta_max"]
+                and drift <= st["max_drift"] and st["hl_min"] <= hl <= st["hl_max"]
+                and (not math.isnan(h) and h <= st["max_hurst"]) and q >= st["min_quality"])
     if eligible and abs(z_now) >= CFG["z_setup"]:
         status = "SETUP"
     elif eligible and abs(z_now) >= CFG["z_watch"]:
@@ -328,7 +340,7 @@ def analyze_pair(a, b, pa, pb):
         "beta_drift": drift, "z": z_now, "z5": z_5, "z20": z_20,
         "exp_move_pct": float(abs(z_now) * sd * 100),
         "spread_sd_pct": float(sd * 100),
-        "quality": float(q), "score": float(total), "status": status,
+        "quality": float(q), "score": float(total), "status": status, "strict": bool(eligible),
         "long": long_leg, "short": short_leg, "n": int(len(df)),
         "last_date": df.index[-1].strftime("%Y-%m-%d"),
         "_z_series": z.tail(CFG["series_days"]),
@@ -428,7 +440,7 @@ def main():
             "drift": fnum(r["beta_drift"], 3), "z": fnum(r["z"], 2), "z5": fnum(r["z5"], 2), "z20": fnum(r["z20"], 2),
             "move": fnum(r["exp_move_pct"], 1), "sd": fnum(r["spread_sd_pct"], 2),
             "q": fnum(r["quality"], 1), "score": fnum(r["score"], 1),
-            "status": r["status"], "long": r["long"], "short": r["short"], "n": r["n"], "last": r["last_date"],
+            "status": r["status"], "strict": r["strict"], "long": r["long"], "short": r["short"], "n": r["n"], "last": r["last_date"],
             "asset": r["asset"], "ma": r["mult_a"], "mb": r["mult_b"], "pxa": fnum(r["last_a"], 2), "pxb": fnum(r["last_b"], 2),
         }
         if id(r) in with_series:
@@ -454,6 +466,7 @@ def main():
         "n_reported": len(results), "n_coint": int(sum(r["p"] < 0.05 for r in results)),
         "n_setup": int(sum(r["status"] == "SETUP" for r in results)),
         "n_watch": int(sum(r["status"] == "WATCH" for r in results)),
+        "n_strict": int(sum(r["strict"] for r in results)),
         "fx_ok": bool(fx_ok), "cfg": CFG, "sectors": list(UNIVERSE.keys()),
         # letzte EUR-Wechselkurse je Währung (Preis_EUR = Preis_lokal * Skala / Kurs)
         "fx_last": {cur: float(fx[tk].dropna().iloc[-1]) for cur, tk in FX_TICKERS.items()

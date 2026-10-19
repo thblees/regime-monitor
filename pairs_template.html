@@ -174,7 +174,7 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
 <div class="kpis" id="kpis"></div>
 
 <div class="card">
-    <div class="card-title"><span>Beste Setups heute</span><span class="hint">Qualität ≥ <span id="qmin"></span> und |z| ≥ <span id="zsetup"></span> (grün) bzw. ≥ <span id="zwatch"></span> (gelb) · Klick öffnet Details</span></div>
+    <div class="card-title"><span>Beste Setups heute</span><span class="hint" id="strict-hint"></span></div>
     <div class="capbar">
         <div class="f"><label>Positionsgröße nach</label><select id="smode"><option value="risk">Risiko je Trade</option><option value="cap">Kapital je Seite</option></select></div>
         <div class="f" id="f-risk"><label>Risiko je Trade</label><input id="risk" type="number" step="100" min="10" value="500"></div>
@@ -226,14 +226,15 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
 <div class="card">
     <div class="card-title"><span>Alle Paare</span><span class="hint">Sortierbar per Klick auf die Spalte · Standard: Gesamt-Score (Qualität × Signal)</span></div>
     <div class="filters">
+        <div class="f"><label>Nur strenge Kriterien</label><select id="f-strict"><option value="1">Ja (Standard)</option><option value="">Nein, alle zeigen</option></select></div>
         <div class="f"><label>Anlageklasse</label><select id="f-asset"><option value="">Alle</option><option value="Aktie">Aktien</option><option value="Rohstoff">Rohstoff-Futures</option><option value="Index">Index-Futures / Indizes</option></select></div>
         <div class="f"><label>Region</label><select id="f-region"><option value="">Alle</option><option value="DE">Deutschland</option><option value="EU">Europa</option><option value="US">USA</option><option value="Asien">Asien</option><option value="Global">Global (Rohstoffe)</option><option value="Cross">Cross-Region</option></select></div>
         <div class="f"><label>Sektor</label><select id="f-sector"><option value="">Alle</option></select></div>
         <div class="f"><label>Status</label><select id="f-status"><option value="">Alle</option><option value="SETUP">Setup</option><option value="WATCH">Watch</option><option value="SETUP,WATCH">Setup + Watch</option><option value="EXTREM">Extrem</option></select></div>
-        <div class="f"><label>Min. Korr.</label><input id="f-corr" type="number" step="0.05" min="0" max="1" value="0.5"></div>
-        <div class="f"><label>Max. p-Wert</label><input id="f-p" type="number" step="0.01" min="0" max="0.2" value="0.05"></div>
+        <div class="f"><label>Min. Korr.</label><input id="f-corr" type="number" step="0.05" min="0" max="1" value="0"></div>
+        <div class="f"><label>Max. p-Wert</label><input id="f-p" type="number" step="0.01" min="0" max="0.2" value="0.2"></div>
         <div class="f"><label>Min. |z|</label><input id="f-z" type="number" step="0.25" min="0" max="6" value="0"></div>
-        <div class="f"><label>Max. Half-Life</label><input id="f-hl" type="number" step="5" min="1" value="60"></div>
+        <div class="f"><label>Max. Half-Life</label><input id="f-hl" type="number" step="5" min="1" value="120"></div>
         <div class="f"><label>FX-Paare</label><select id="f-fx"><option value="">Alle</option><option value="no">Nur gleiche Währung</option><option value="yes">Nur Cross-Currency</option></select></div>
         <div class="f"><label>Suche</label><input id="f-q" type="text" placeholder="Ticker oder Name"></div>
         <button class="btn" id="f-reset">Zurücksetzen</button>
@@ -268,7 +269,7 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
     </div></details>
     <details><summary>Qualitäts- und Gesamt-Score</summary><div class="body">
         <p>Der <b>Qualitäts-Score</b> (0–100) bewertet die statistische Eignung des Paares unabhängig vom heutigen Signal: Kointegration bis 35 Punkte (p=0 → 35, p ≥ 0.10 → 0), Korrelation bis 20 (0.30 → 0, 0.90 → 20), Half-Life bis 20 (volle Punkte bei 5–40 Tagen), Beta-Stabilität bis 10, Hurst bis 15 (H ≤ 0.2 → 15, H ≥ 0.5 → 0).</p>
-        <p>Den Status <b>SETUP</b> bzw. <b>WATCH</b> erhalten nur Paare mit Qualität ≥ 55 <i>und</i> einer Renditekorrelation von mindestens 0,40. Ein Paar kann statistisch kointegriert sein und trotzdem im Alltag kaum gemeinsam schwanken – solche Spreads sind launisch und bleiben in der Tabelle, aber nicht in den Setups.</p>
+        <p><b>Strenge Kriterien:</b> Den Status <b>SETUP</b> bzw. <b>WATCH</b> erhalten nur „saubere" Paare: p ≤ 0,05, Renditekorrelation ≥ 0,60, Hedge Ratio β zwischen 0,75 und 1,35 (nahe 1, also echte Zwillinge statt Modell-Wette), Beta-Drift ≤ 0,20, Half-Life 3–40 Tage, Hurst &lt; 0,5 und Qualität ≥ 60. Die Tabelle zeigt standardmäßig nur diese Paare (Filter „Nur strenge Kriterien"); mit „Nein, alle zeigen" erscheinen auch die übrigen Kandidaten, erkennbar am fehlenden grünen Haken. Die Schwellen stehen in <code>pairs_screener.py</code> unter <code>CFG["strict"]</code>.</p>
         <p>Der <b>Gesamt-Score</b> multipliziert die Qualität mit dem Signal <code>min(|z| / 2, 1)</code>. Ein hervorragendes Paar ohne aktuelle Abweichung landet also unten in der Liste – es ist heute schlicht nicht handelbar. Bei |z| ≥ 4 wird der Score um 30 % gekürzt.</p>
         <p><b>Erw. Bewegung</b>: Spread-Rückkehr zum Mittel in Prozent (|z| × Spread-Standardabweichung) – das theoretische Potenzial des Trades vor Kosten, wenn der Spread vollständig schließt.</p>
     </div></details>
@@ -304,15 +305,14 @@ const fmt = (x, d=2) => (x === null || x === undefined || Number.isNaN(x)) ? '�
 const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 document.getElementById('ts').textContent = M.data_date + ' · generiert ' + M.generated;
-document.getElementById('qmin').textContent = CFG.quality_min;
-document.getElementById('zsetup').textContent = CFG.z_setup.toFixed(1);
-document.getElementById('zwatch').textContent = CFG.z_watch.toFixed(1);
+const ST = CFG.strict;
+document.getElementById('strict-hint').innerHTML = `Nur strenge Kriterien: p ≤ ${ST.max_p} · Korrelation ≥ ${ST.min_corr} · β ${ST.beta_min}–${ST.beta_max} · Beta-Drift ≤ ${ST.max_drift} · Half-Life ${ST.hl_min}–${ST.hl_max}d · Hurst &lt; ${ST.max_hurst} · Qualität ≥ ${ST.min_quality} — SETUP ab |z| ≥ ${CFG.z_setup.toFixed(1)} (grün), WATCH ab ${CFG.z_watch.toFixed(1)} (gelb) · Klick öffnet Details`;
 document.getElementById('footer').innerHTML = `Datenquelle: Yahoo Finance (Schlusskurse, dividendenbereinigt) · ${M.n_tickers} von ${M.n_universe} Aktien mit ausreichender Historie · Kointegration: Engle-Granger über ${CFG.coint_window} Handelstage · Korrelation: ${CFG.corr_window} Tage · ${M.fx_ok ? 'Cross-Currency-Paare in EUR umgerechnet' : 'FX-Daten fehlten – Cross-Currency-Paare in Lokalwährung'} · Keine Anlageberatung · <a href="https://www.meine-geldseite.de">meine-geldseite.de</a>`;
 
 // KPIs
 document.getElementById('kpis').innerHTML = [
     ['Aktien', M.n_tickers, ''], ['Paare getestet', M.n_tested, ''],
-    ['Kointegriert (p<0.05)', M.n_coint, 'b'], ['Setups (|z| ≥ ' + CFG.z_setup + ')', M.n_setup, 'g'], ['Watch', M.n_watch, 'y'],
+    ['Kointegriert (p<0.05)', M.n_coint, ''], ['Strenge Kriterien erfüllt', M.n_strict, 'b'], ['Setups (|z| ≥ ' + CFG.z_setup + ')', M.n_setup, 'g'], ['Watch', M.n_watch, 'y'],
 ].map(([l,v,c]) => `<div class="kpi"><div class="l">${l}</div><div class="v ${c}">${v}</div></div>`).join('');
 
 // Sektor-Filter füllen
@@ -420,7 +420,7 @@ document.querySelectorAll('.setup .wlbtn').forEach(el => el.addEventListener('cl
 
 // Tabelle
 const COLS = [
-    {k:'status', l:'Status', cls:'l', r:p => `<span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? '·' : p.status}</span>`, v:p => ({SETUP:3,WATCH:2,EXTREM:1,'-':0})[p.status]},
+    {k:'status', l:'Status', cls:'l', r:p => `<span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? (p.strict ? '<span class="g" title="erfüllt strenge Kriterien">✓</span>' : '·') : p.status}</span>`, v:p => ({SETUP:3,WATCH:2,EXTREM:1,'-':0})[p.status] + (p.strict ? 0.5 : 0)},
     {k:'pair', l:'Paar (Long / Short)', cls:'l', r:p => `<span class="pair">${legsHtml(p)}</span>${p.fx ? '<span class="fxtag">FX</span>' : ''}<span class="sub">${esc(p.na)} / ${esc(p.nb)}</span>`, v:p => p.long + p.short},
     {k:'size', l:'Kaufen / Verkaufen', cls:'l', r:p => { const z = sizing(p, capFor(p), WMODE); return z ? `<span class="lg">${nf(z.nL)}</span> <span class="mut">×</span> ${esc(p.long)}<br><span class="sh">${nf(z.nS)}</span> <span class="mut">×</span> ${esc(p.short)}` : '–'; }, v:p => p.score},
     {k:'sector', l:'Sektor', cls:'l', r:p => `${esc(p.sector)}<span class="sub">${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region}</span>`, v:p => p.sector},
@@ -445,14 +445,14 @@ document.querySelectorAll('th').forEach(th => th.addEventListener('click', () =>
 }));
 
 const F = id => document.getElementById(id);
-['f-asset','f-region','f-sector','f-status','f-corr','f-p','f-z','f-hl','f-fx','f-q'].forEach(id => F(id).addEventListener('input', () => { page = 0; render(); }));
-F('f-reset').addEventListener('click', () => { F('f-asset').value=''; F('f-region').value=''; F('f-sector').value=''; F('f-status').value=''; F('f-corr').value=0.5; F('f-p').value=0.05; F('f-z').value=0; F('f-hl').value=60; F('f-fx').value=''; F('f-q').value=''; page=0; render(); });
+['f-strict','f-asset','f-region','f-sector','f-status','f-corr','f-p','f-z','f-hl','f-fx','f-q'].forEach(id => F(id).addEventListener('input', () => { page = 0; render(); }));
+F('f-reset').addEventListener('click', () => { F('f-strict').value='1'; F('f-asset').value=''; F('f-region').value=''; F('f-sector').value=''; F('f-status').value=''; F('f-corr').value=0; F('f-p').value=0.2; F('f-z').value=0; F('f-hl').value=120; F('f-fx').value=''; F('f-q').value=''; page=0; render(); });
 
 function render() {
-    const asset = F('f-asset').value, reg = F('f-region').value, sec = F('f-sector').value, st = F('f-status').value.split(',').filter(Boolean),
+    const strict = !!F('f-strict').value, asset = F('f-asset').value, reg = F('f-region').value, sec = F('f-sector').value, st = F('f-status').value.split(',').filter(Boolean),
         minC = parseFloat(F('f-corr').value) || 0, maxP = parseFloat(F('f-p').value) || 1, minZ = parseFloat(F('f-z').value) || 0,
         maxHL = parseFloat(F('f-hl').value) || 1e9, fx = F('f-fx').value, q = F('f-q').value.trim().toLowerCase();
-    filtered = P.filter(p => (!asset || p.asset === asset) && (!reg || p.region === reg) && (!sec || p.sector === sec) && (!st.length || st.includes(p.status))
+    filtered = P.filter(p => (!strict || p.strict) && (!asset || p.asset === asset) && (!reg || p.region === reg) && (!sec || p.sector === sec) && (!st.length || st.includes(p.status))
         && p.corr >= minC && p.p <= maxP && Math.abs(p.z) >= minZ && (p.hl !== null && p.hl <= maxHL)
         && (!fx || (fx === 'yes') === p.fx)
         && (!q || [p.a,p.b,p.na,p.nb].some(s => s.toLowerCase().includes(q))));
