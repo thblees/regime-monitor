@@ -355,7 +355,8 @@ function showDetail(id, scroll) {
         const notL = mL * pxL, notS = mS * pxS;
         // Kontraktzahl Short je 1 Kontrakt Long; bei Fremdwährung Notionals grob über das Verhältnis der Notionals in Lokalwährung
         const nShort = notL * ratio / notS;
-        sizing = `Für <b>1 Kontrakt Long ${esc(p.long)}</b> (Notional ≈ ${fmt(notL,0)} ${cL}, Multiplikator ${mL}) ca. <b>${fmt(nShort,2)} Kontrakte Short ${esc(p.short)}</b> (Notional ≈ ${fmt(notS,0)} ${cS} je Kontrakt)${cL !== cS ? ' – unterschiedliche Währungen, Notionals vor dem Trade in eine Währung umrechnen' : ''}.`;
+        const ganz = nShort >= 1 ? `${Math.round(nShort)} Short je 1 Long` : `${Math.round(1 / nShort)} Long je 1 Short`;
+        sizing = `Für <b>1 Kontrakt Long ${esc(p.long)}</b> (Notional ≈ ${fmt(notL,0)} ${cL}, Multiplikator ${mL}) ca. <b>${fmt(nShort,2)} Kontrakte Short ${esc(p.short)}</b> (Notional ≈ ${fmt(notS,0)} ${cS} je Kontrakt) – ganzzahlig etwa <b>${ganz}</b>${cL !== cS ? '; unterschiedliche Währungen, Notionals vor dem Trade in eine Währung umrechnen' : ''}.`;
     } else {
         sizing = `Für 10.000 ${cur} Long <b>${esc(p.long)}</b> ca. <b>${fmt(ratio*10000,0)} ${cur}</b> Short <b>${esc(p.short)}</b>.`;
     }
