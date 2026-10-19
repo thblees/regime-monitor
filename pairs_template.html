@@ -53,6 +53,7 @@ body { background:var(--bg); color:var(--text); font-family:'Inter Tight',sans-s
 .setup .facts b { font-weight:600; color:var(--text); }
 .setup .tag { position:absolute; right:12px; top:12px; font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:4px; background:rgba(74,222,128,0.15); color:var(--green); }
 .setup.watch .tag { background:rgba(251,191,36,0.15); color:var(--yellow); }
+.setup.watch .tag::after { content:' · noch kein Einstieg'; font-weight:400; }
 .setup.extrem .tag { background:rgba(239,68,68,0.15); color:var(--red); }
 .empty { color:var(--text-muted); font-size:13px; padding:8px 0; }
 .setup .size { margin-top:8px; padding-top:8px; border-top:1px solid var(--border); font-family:var(--mono); font-size:11.5px; color:var(--text-dim); line-height:1.6; }
@@ -174,7 +175,7 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
 <div class="kpis" id="kpis"></div>
 
 <div class="card">
-    <div class="card-title"><span>Beste Setups heute</span><span class="hint" id="strict-hint"></span></div>
+    <div class="card-title"><span id="setups-title">Setups &amp; Watch-Kandidaten heute</span><span class="hint" id="strict-hint"></span></div>
     <div class="capbar">
         <div class="f"><label>Positionsgröße nach</label><select id="smode"><option value="risk">Risiko je Trade</option><option value="cap">Kapital je Seite</option></select></div>
         <div class="f" id="f-risk"><label>Risiko je Trade</label><input id="risk" type="number" step="100" min="10" value="500"></div>
@@ -269,6 +270,7 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
     </div></details>
     <details><summary>Qualitäts- und Gesamt-Score</summary><div class="body">
         <p>Der <b>Qualitäts-Score</b> (0–100) bewertet die statistische Eignung des Paares unabhängig vom heutigen Signal: Kointegration bis 35 Punkte (p=0 → 35, p ≥ 0.10 → 0), Korrelation bis 20 (0.30 → 0, 0.90 → 20), Half-Life bis 20 (volle Punkte bei 5–40 Tagen), Beta-Stabilität bis 10, Hurst bis 15 (H ≤ 0.2 → 15, H ≥ 0.5 → 0).</p>
+        <p><b>SETUP vs. WATCH:</b> SETUP heißt, der Spread ist mit |z| ≥ 2 weit genug ausgeweitet für einen Einstieg. WATCH heißt, das Paar erfüllt alle Kriterien und |z| liegt zwischen 1,5 und 2 – noch kein Einstieg, aber täglich beobachten, weil das Signal kurz bevorstehen kann. Die Kachel „Setups" zählt nur echte Einstiegssignale.</p>
         <p><b>Strenge Kriterien:</b> Den Status <b>SETUP</b> bzw. <b>WATCH</b> erhalten nur „saubere" Paare: p ≤ 0,05, Renditekorrelation ≥ 0,60, Hedge Ratio β zwischen 0,75 und 1,35 (nahe 1, also echte Zwillinge statt Modell-Wette), Beta-Drift ≤ 0,20, Half-Life 3–40 Tage, Hurst &lt; 0,5 und Qualität ≥ 60. Die Tabelle zeigt standardmäßig nur diese Paare (Filter „Nur strenge Kriterien"); mit „Nein, alle zeigen" erscheinen auch die übrigen Kandidaten, erkennbar am fehlenden grünen Haken. Die Schwellen stehen in <code>pairs_screener.py</code> unter <code>CFG["strict"]</code>.</p>
         <p>Der <b>Gesamt-Score</b> multipliziert die Qualität mit dem Signal <code>min(|z| / 2, 1)</code>. Ein hervorragendes Paar ohne aktuelle Abweichung landet also unten in der Liste – es ist heute schlicht nicht handelbar. Bei |z| ≥ 4 wird der Score um 30 % gekürzt.</p>
         <p><b>Erw. Bewegung</b>: Spread-Rückkehr zum Mittel in Prozent (|z| × Spread-Standardabweichung) – das theoretische Potenzial des Trades vor Kosten, wenn der Spread vollständig schließt.</p>
@@ -306,6 +308,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 
 document.getElementById('ts').textContent = M.data_date + ' · generiert ' + M.generated;
 const ST = CFG.strict;
+document.getElementById('setups-title').innerHTML = `Heute: <span class="g">${M.n_setup} Setup${M.n_setup === 1 ? '' : 's'}</span> (|z| ≥ ${CFG.z_setup.toFixed(1)}) · <span class="y">${M.n_watch} Watch</span> (|z| ${CFG.z_watch.toFixed(1)}–${CFG.z_setup.toFixed(1)}, noch kein Einstieg)`;
 document.getElementById('strict-hint').innerHTML = `Nur strenge Kriterien: p ≤ ${ST.max_p} · Korrelation ≥ ${ST.min_corr} · β ${ST.beta_min}–${ST.beta_max} · Beta-Drift ≤ ${ST.max_drift} · Half-Life ${ST.hl_min}–${ST.hl_max}d · Hurst &lt; ${ST.max_hurst} · Qualität ≥ ${ST.min_quality} — SETUP ab |z| ≥ ${CFG.z_setup.toFixed(1)} (grün), WATCH ab ${CFG.z_watch.toFixed(1)} (gelb) · Klick öffnet Details`;
 document.getElementById('footer').innerHTML = `Datenquelle: Yahoo Finance (Schlusskurse, dividendenbereinigt) · ${M.n_tickers} von ${M.n_universe} Aktien mit ausreichender Historie · Kointegration: Engle-Granger über ${CFG.coint_window} Handelstage · Korrelation: ${CFG.corr_window} Tage · ${M.fx_ok ? 'Cross-Currency-Paare in EUR umgerechnet' : 'FX-Daten fehlten – Cross-Currency-Paare in Lokalwährung'} · Keine Anlageberatung · <a href="https://www.meine-geldseite.de">meine-geldseite.de</a>`;
 
@@ -413,7 +416,7 @@ document.getElementById('setups').innerHTML = setups.length ? setups.map(p => `
         ${sizeLine(p)}
         <div class="exit">${exitPlan(p)}</div>
         <div class="act">${wlButton(p)}</div>
-    </div>`).join('') : '<div class="empty">Heute kein Paar mit Qualität ≥ ' + CFG.quality_min + ' und |z| ≥ ' + CFG.z_watch + '. Die Tabelle unten zeigt alle Kandidaten.</div>';
+    </div>`).join('') : '<div class="empty">Heute erfüllt kein Paar die strengen Kriterien mit |z| ≥ ' + CFG.z_watch.toFixed(1) + '. Die Tabelle unten zeigt die ' + M.n_strict + ' Paare, die die Kriterien erfüllen – sie warten auf eine Spread-Ausweitung.</div>';
 document.querySelectorAll('.setup').forEach(el => el.addEventListener('click', e => { if (e.target.closest('.wlbtn')) return; showDetail(+el.dataset.id, true); }));
 document.querySelectorAll('.setup .wlbtn').forEach(el => el.addEventListener('click', e => { e.stopPropagation(); addTrade(+el.dataset.pid); }));
 }
