@@ -99,6 +99,22 @@ tr.row.sel td { background:rgba(96,165,250,0.12); }
 .bar { display:inline-block; width:46px; height:6px; background:var(--bg-elevated); border-radius:3px; vertical-align:middle; margin-left:6px; overflow:hidden; }
 .bar i { display:block; height:100%; border-radius:3px; }
 .fxtag { font-size:9px; color:var(--purple); border:1px solid rgba(192,132,252,0.4); border-radius:3px; padding:0 4px; margin-left:6px; vertical-align:middle; }
+.wlbtn { background:rgba(96,165,250,0.12); color:var(--blue); border:1px solid rgba(96,165,250,0.4); border-radius:6px; padding:4px 10px; font-family:var(--mono); font-size:11px; cursor:pointer; }
+.wlbtn:hover { background:rgba(96,165,250,0.25); }
+.wlbtn.done { color:var(--text-muted); border-color:var(--border); background:transparent; cursor:default; }
+.wlbtn.sm { padding:2px 7px; font-size:10px; }
+.wlbtn.red { color:var(--red); border-color:rgba(239,68,68,0.4); background:rgba(239,68,68,0.1); }
+.setup .act { margin-top:8px; text-align:right; }
+.setup .exit { font-family:var(--mono); font-size:10.5px; color:var(--text-muted); margin-top:6px; }
+.wl td { white-space:normal; }
+.wl .st.HALTEN { background:rgba(96,165,250,0.15); color:var(--blue); }
+.wl .st.TEILGEWINN { background:rgba(251,191,36,0.15); color:var(--yellow); }
+.wl .st.ZIEL { background:rgba(74,222,128,0.15); color:var(--green); }
+.wl .st.STOP, .wl .st.ZEITSTOP { background:rgba(239,68,68,0.15); color:var(--red); }
+.wl .st.DATEN { color:var(--text-muted); }
+.wl .why { display:block; font-family:'Inter Tight',sans-serif; font-size:11px; color:var(--text-dim); margin-top:3px; max-width:260px; }
+.wl-tools { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.wl-tools input[type=file] { display:none; }
 .pager { display:flex; gap:8px; justify-content:center; align-items:center; margin-top:12px; font-family:var(--mono); font-size:12px; color:var(--text-dim); }
 
 .detail { display:none; }
@@ -193,6 +209,20 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
     </div>
 </div>
 
+<div class="card wl" id="wl">
+    <div class="card-title"><span>Meine Watchlist · offene Trades</span>
+        <span class="wl-tools"><span class="hint">Gespeichert in diesem Browser · täglich neu bewertet</span>
+            <button class="wlbtn sm" id="wl-export">Export</button>
+            <label class="wlbtn sm" for="wl-import">Import</label><input type="file" id="wl-import" accept="application/json">
+        </span></div>
+    <div class="tbl-wrap"><table><thead><tr>
+        <th class="l">Paar</th><th class="l">Eingang</th><th class="l">Position</th><th>z heute</th><th>Weg zum Ziel</th><th>P&amp;L ≈</th><th>Tage offen</th><th class="l">Empfehlung</th><th class="l">Aktion</th>
+    </tr></thead><tbody id="wl-body"></tbody></table></div>
+    <details style="margin-top:14px"><summary>Geschlossene Trades</summary><div class="body"><div class="tbl-wrap"><table><thead><tr>
+        <th class="l">Paar</th><th class="l">Eingang</th><th class="l">Ausgang</th><th>z Ein → Aus</th><th>P&amp;L</th><th class="l">Aktion</th>
+    </tr></thead><tbody id="wl-closed"></tbody></table></div></div></details>
+</div>
+
 <div class="card">
     <div class="card-title"><span>Alle Paare</span><span class="hint">Sortierbar per Klick auf die Spalte · Standard: Gesamt-Score (Qualität × Signal)</span></div>
     <div class="filters">
@@ -245,6 +275,13 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
         <p><b>Europäische und asiatische Indizes</b> (DAX, Euro Stoxx 50, FTSE 100, SMI, Nikkei, Hang Seng) gibt es bei Yahoo nicht als Future, deshalb wird der <b>Kassa-Index</b> verwendet. Die Kointegrationsstatistik ist praktisch identisch mit der des Futures (Basis und Dividenden sind klein gegenüber der Spread-Volatilität); gehandelt wird dann über den zugehörigen Future (FDAX, FESX, Z, FSMI …), dessen Multiplikator im Universum hinterlegt ist.</p>
         <p><b>Positionsgröße:</b> Die Hedge Ratio β bezieht sich auf das <b>Notional</b> (Kontraktwert = Preis × Multiplikator), nicht auf die Kontraktzahl. Die Detailansicht rechnet das für den aktuellen Kurs um: 1 Kontrakt Long → x Kontrakte Short. Da Kontrakte nicht teilbar sind, wird gerundet – Micro-Kontrakte (MES, MNQ, MGC, MCL …) erlauben feinere Verhältnisse. Bei Cross-Currency-Paaren (ES vs. DAX) kommt das Währungsrisiko hinzu.</p>
         <p><b>Handelszeiten:</b> Futures handeln fast rund um die Uhr, Kassa-Indizes nur während der Börsenzeit. Die Tagesschlusskurse stammen deshalb von unterschiedlichen Zeitpunkten, was die gemessene Korrelation zwischen US-Futures und europäischen Indizes nach unten verzerrt. Die Kointegration über Wochen und Monate ist davon kaum betroffen.</p>
+    </div></details>
+    <details><summary>Wann schließe ich einen Trade? (Watchlist)</summary><div class="body">
+        <p><b>Ziel:</b> Der Trade ist aufgegangen, wenn der Spread zum Mittel zurückgekehrt ist, also <b>z ≈ 0</b>. Dann ist der statistische Vorteil verbraucht; wer weiter hält, wettet auf ein Überschießen in die Gegenrichtung. Viele Praktiker nehmen ab |z| &lt; 1 einen <b>Teilgewinn</b> mit oder ziehen den Stop auf Einstand.</p>
+        <p><b>Stop:</b> Läuft der Spread weiter auseinander bis |z| ≥ 3,5 (einstellbar), stimmt die Beziehung gerade nicht – Strukturbruch, Übernahme, Gewinnwarnung. Verlust begrenzen, nicht nachkaufen.</p>
+        <p><b>Zeit-Stop:</b> Die Half-Life sagt, wie schnell der Spread üblicherweise konvergiert. Ist der Trade nach etwa dem Dreifachen der Half-Life noch nicht am Ziel, verhält sich das Paar anders als in der Vergangenheit – schließen und Kapital freigeben.</p>
+        <p><b>Watchlist:</b> Mit „+ Watchlist" wird ein Setup mit Einstiegsdatum, Einstiegs-z, Stückzahlen und Stop gespeichert. Bei jedem Besuch bewertet das Dashboard jeden offenen Trade neu mit den aktuellen Daten: z heute, Prozent des Weges zum Mittel, geschätzter P&amp;L aus den Kursbewegungen und die Empfehlung HALTEN / TEILGEWINN / ZIEL / STOP / ZEIT-STOP. „Schließen" verschiebt den Trade mit Ausstiegs-z und P&amp;L in die Historie.</p>
+        <p><b>Wichtig:</b> Die Watchlist liegt im Speicher deines Browsers (localStorage), nicht auf dem Server. Anderer Browser oder anderes Gerät = andere Liste. Mit „Export" sicherst du sie als JSON-Datei, mit „Import" lädst du sie woanders wieder ein. Der P&amp;L ist eine Schätzung aus Schlusskursen ohne Gebühren, Leihkosten, Dividenden und Währungseffekte. Ausgefallene Paare (zu wenig Kurshistorie) zeigen „keine Daten".</p>
     </div></details>
     <details><summary>Wie setze ich einen Trade um?</summary><div class="body">
         <p>Die Hedge Ratio β bezieht sich auf Log-Kurse und entspricht näherungsweise dem <b>Verhältnis der Positionsgrößen in Geld</b>: Für 10.000 € in Aktie A (Long) werden ca. β × 10.000 € in Aktie B (Short) gestellt. Bei β nahe 1 ist der Trade geldneutral.</p>
@@ -372,10 +409,12 @@ document.getElementById('setups').innerHTML = setups.length ? setups.map(p => `
             <div><span>Qualität</span><b>${fmt(p.q,0)}</b></div>
         </div>
         ${sizeLine(p)}
+        <div class="exit">${exitPlan(p)}</div>
+        <div class="act">${wlButton(p)}</div>
     </div>`).join('') : '<div class="empty">Heute kein Paar mit Qualität ≥ ' + CFG.quality_min + ' und |z| ≥ ' + CFG.z_watch + '. Die Tabelle unten zeigt alle Kandidaten.</div>';
-document.querySelectorAll('.setup').forEach(el => el.addEventListener('click', () => showDetail(+el.dataset.id, true)));
+document.querySelectorAll('.setup').forEach(el => el.addEventListener('click', e => { if (e.target.closest('.wlbtn')) return; showDetail(+el.dataset.id, true); }));
+document.querySelectorAll('.setup .wlbtn').forEach(el => el.addEventListener('click', e => { e.stopPropagation(); addTrade(+el.dataset.pid); }));
 }
-renderSetups();
 
 // Tabelle
 const COLS = [
@@ -395,6 +434,7 @@ const COLS = [
     {k:'move', l:'Erw. Bew.', r:p => fmt(p.move,1) + '%', v:p => p.move},
     {k:'q', l:'Qualität', r:p => `${fmt(p.q,0)}${bar(p.q,100,'var(--blue)')}`, v:p => p.q},
     {k:'score', l:'Score', r:p => `<b>${fmt(p.score,0)}</b>${bar(p.score,100,'var(--green)')}`, v:p => p.score},
+    {k:'wl', l:'Watchlist', cls:'l', r:p => wlButton(p, true), v:p => inWatchlist(p) ? 1 : 0},
 ];
 let sortKey = 'score', sortDir = -1, page = 0, PAGE = 50, filtered = [];
 document.getElementById('thead').innerHTML = COLS.map(c => `<th class="${c.cls||''}" data-k="${c.k}">${c.l}</th>`).join('');
@@ -422,7 +462,8 @@ function render() {
     const slice = filtered.slice(page * PAGE, (page + 1) * PAGE);
     F('tbody').innerHTML = slice.map(p => `<tr class="row ${p.id === selId ? 'sel' : ''}" data-id="${p.id}">${COLS.map(c => `<td class="${c.cls||''}">${c.r(p)}</td>`).join('')}</tr>`).join('')
         || `<tr><td colspan="${COLS.length}" class="l mut">Keine Paare für diese Filter.</td></tr>`;
-    document.querySelectorAll('tr.row').forEach(tr => tr.addEventListener('click', () => showDetail(+tr.dataset.id, false)));
+    document.querySelectorAll('tr.row').forEach(tr => tr.addEventListener('click', e => { if (e.target.closest('.wlbtn')) return; showDetail(+tr.dataset.id, false); }));
+    document.querySelectorAll('tr.row .wlbtn').forEach(el => el.addEventListener('click', e => { e.stopPropagation(); addTrade(+el.dataset.pid); }));
     F('pager').innerHTML = pages > 1 ? `<button class="btn" ${page===0?'disabled':''} id="pg-prev">‹</button><span>Seite ${page+1} / ${pages}</span><button class="btn" ${page>=pages-1?'disabled':''} id="pg-next">›</button>` : '';
     if (pages > 1) { F('pg-prev').onclick = () => { page--; render(); }; F('pg-next').onclick = () => { page++; render(); }; }
 }
@@ -439,7 +480,8 @@ function showDetail(id, scroll) {
     const nl = p.long === p.a ? p.na : p.nb, ns = p.short === p.a ? p.na : p.nb;
     F('d-meta').textContent = `${nl} / ${ns} · ${p.sector} · ${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region} · ${p.ca === p.cb ? p.ca : p.ca + ' / ' + p.cb + ' (Spread in EUR)'} · ${p.n} gemeinsame Handelstage · Stand ${p.last}`;
     const ratio = p.long === p.a ? p.beta : 1 / p.beta;  // Notional Short pro 1 Notional Long
-    F('d-trade').innerHTML = `<b>Trade-Idee:</b> Spread ${p.z > 0 ? 'über' : 'unter'} dem Mittel (z = <b class="${zClass(p.z)}">${fmt(p.z)}</b>): <b>${esc(p.long)}</b> ist relativ zu <b>${esc(p.short)}</b> zu billig → Long ${esc(p.long)}, Short ${esc(p.short)}. Hedge Ratio β = ${fmt(p.beta,3)} (${esc(p.b)} ~ ${esc(p.a)}), d.h. Short-Seite ≈ ${fmt(ratio,2)} × Long-Seite. Erwartete Spread-Bewegung bis zum Mittel: <b>${fmt(p.move,1)}%</b>. Status: <span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? 'kein Signal' : p.status}</span>${Math.abs(p.z) >= CFG.z_extreme ? ' – <span class="r">Strukturbruch prüfen!</span>' : ''}`;
+    F('d-trade').innerHTML = `<b>Trade-Idee:</b> Spread ${p.z > 0 ? 'über' : 'unter'} dem Mittel (z = <b class="${zClass(p.z)}">${fmt(p.z)}</b>): <b>${esc(p.long)}</b> ist relativ zu <b>${esc(p.short)}</b> zu billig → Long ${esc(p.long)}, Short ${esc(p.short)}. Hedge Ratio β = ${fmt(p.beta,3)} (${esc(p.b)} ~ ${esc(p.a)}), d.h. Short-Seite ≈ ${fmt(ratio,2)} × Long-Seite. Erwartete Spread-Bewegung bis zum Mittel: <b>${fmt(p.move,1)}%</b>. Status: <span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? 'kein Signal' : p.status}</span>${Math.abs(p.z) >= CFG.z_extreme ? ' – <span class="r">Strukturbruch prüfen!</span>' : ''}<br><b>Exit-Plan:</b> ${exitPlan(p)}<div style="margin-top:8px">${wlButton(p)}</div>`;
+    F('d-trade').querySelectorAll('.wlbtn').forEach(el => el.addEventListener('click', () => addTrade(+el.dataset.pid)));
     const z = sizing(p, capFor(p), WMODE);
     if (!z) {
         F('d-size').innerHTML = '<div class="sum">Keine aktuellen Kurse für die Stückzahlberechnung.</div>';
@@ -496,6 +538,97 @@ function showDetail(id, scroll) {
     }
     if (scroll) d.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+// ---- Watchlist ----
+const TRACK = DATA.track || {}, LASTPX = DATA.last_px || {};
+const UMAP = {}; (DATA.universe || []).forEach(u => UMAP[u.t] = u);
+let TRADES = [];
+try { TRADES = JSON.parse(localStorage.getItem('pairs_trades') || '[]'); } catch (e) { TRADES = []; }
+function saveTrades() { try { localStorage.setItem('pairs_trades', JSON.stringify(TRADES)); } catch (e) {} }
+function timeLimit(hl) { return hl ? Math.max(10, Math.round(3 * hl)) : 60; }
+function exitPlan(p) {
+    return `Ziel: z → 0 (Teilgewinn ab |z| &lt; 1) · Stop: |z| ≥ ${fmt(ZSTOP,1)} · Zeit-Stop: ~3 × Half-Life ≈ ${timeLimit(p.hl)} Handelstage`;
+}
+function inWatchlist(p) { return TRADES.some(t => !t.closed && t.long === p.long && t.short === p.short); }
+function wlButton(p, small) {
+    return inWatchlist(p) ? `<button class="wlbtn done ${small ? 'sm' : ''}" disabled>✓ in Watchlist</button>`
+        : `<button class="wlbtn ${small ? 'sm' : ''}" data-pid="${p.id}">+ Watchlist</button>`;
+}
+function addTrade(id) {
+    const p = P[id]; if (!p || inWatchlist(p)) return;
+    const z = sizing(p, capFor(p), WMODE);
+    TRADES.push({ id: Date.now(), a: p.a, b: p.b, long: p.long, short: p.short, nl: p.long === p.a ? p.na : p.nb, ns: p.short === p.a ? p.na : p.nb,
+        sector: p.sector, asset: p.asset, entryDate: M.data_date, entryZ: p.z, sd: p.sd, beta: p.beta, hl: p.hl, zstop: ZSTOP,
+        nL: z ? z.nL : null, nS: z ? z.nS : null, unit: z ? z.unit : 'Stück', vL: z ? z.vL : null, vS: z ? z.vS : null, disp: z ? z.disp : (p.ca === p.cb ? curLabel(p.ca) : 'EUR'),
+        notL: z ? z.notL : null, notS: z ? z.notS : null, closed: null });
+    saveTrades(); renderWatchlist(); renderSetups(); render(); if (selId !== null) showDetail(selId, false);
+}
+function unitValueNow(t, ticker) {
+    const u = UMAP[ticker]; const px = LASTPX[ticker];
+    if (!u || !(px > 0)) return NaN;
+    return toDisp(px, u.cur, t.disp) * (u.mult || 1);
+}
+function tradingDays(d1, d2) { const ms = (new Date(d2) - new Date(d1)) / 86400000; return Math.max(0, Math.round(ms * 5 / 7)); }
+function evalTrade(t) {
+    const key = [t.a, t.b].sort().join('|'); const tr = TRACK[key];
+    const out = { zc: null, status: 'DATEN', label: 'keine Daten', why: 'Paar heute nicht im Datensatz (zu wenig Kurshistorie oder Ticker ausgefallen).', pnl: NaN, days: tradingDays(t.entryDate, M.data_date), limit: timeLimit(t.hl), progress: NaN };
+    if (!tr) return out;
+    const zc = tr[0] === t.b ? tr[1] : -tr[1];
+    const dir = t.entryZ >= 0 ? 1 : -1;          // dir>0: Spread war zu hoch, z soll fallen
+    const zr = zc * dir;                          // "relativer" z: positiv = noch auf der Einstiegsseite
+    const ze = Math.abs(t.entryZ);
+    out.zc = zc; out.progress = ze > 0 ? (ze - zr) / ze : 0;   // 0 = Einstieg, 1 = Ziel erreicht
+    const vLn = unitValueNow(t, t.long), vSn = unitValueNow(t, t.short);
+    if (t.nL && t.nS && t.vL && t.vS && vLn > 0 && vSn > 0) out.pnl = t.nL * (vLn - t.vL) - t.nS * (vSn - t.vS);
+    if (zr >= t.zstop) { out.status = 'STOP'; out.label = 'STOP · schließen'; out.why = `|z| = ${fmt(Math.abs(zc))} hat den Stop ${fmt(t.zstop,1)} erreicht – die Beziehung hält gerade nicht, Verlust begrenzen.`; }
+    else if (zr <= 0.25) { out.status = 'ZIEL'; out.label = zr < -0.75 ? 'ZIEL ÜBERSCHRITTEN · schließen' : 'ZIEL · schließen'; out.why = `Spread ist am Mittel (z = ${fmt(zc)}). Gewinn mitnehmen; weiteres Halten wäre eine Wette in die Gegenrichtung.`; }
+    else if (out.days >= out.limit) { out.status = 'ZEITSTOP'; out.label = 'ZEIT-STOP · schließen'; out.why = `${out.days} Handelstage offen, Limit ~${out.limit} (3 × Half-Life). Der Spread konvergiert langsamer als erwartet.`; }
+    else if (zr <= 1.0) { out.status = 'TEILGEWINN'; out.label = 'TEILGEWINN möglich'; out.why = `z = ${fmt(zc)}: ${fmt(out.progress*100,0)} % des Weges geschafft. Hälfte schließen oder Stop auf Einstand ziehen.`; }
+    else if (out.progress < -0.05) { out.status = 'HALTEN'; out.label = 'HALTEN · beobachten'; out.why = `Spread hat sich seit Einstieg weiter ausgeweitet (z von ${fmt(t.entryZ)} auf ${fmt(zc)}). Noch ${fmt(t.zstop - Math.abs(zc))} z bis zum Stop, Zeit-Stop in ~${out.limit - out.days} Handelstagen.`; }
+    else { out.status = 'HALTEN'; out.label = 'HALTEN'; out.why = `z = ${fmt(zc)} (Einstieg ${fmt(t.entryZ)}), ${fmt(Math.max(0,out.progress)*100,0)} % des Weges zum Mittel. Zeit-Stop in ~${out.limit - out.days} Handelstagen.`; }
+    return out;
+}
+function closeTrade(id) {
+    const t = TRADES.find(x => x.id === id); if (!t) return;
+    const e = evalTrade(t); t.closed = { date: M.data_date, z: e.zc, pnl: isNaN(e.pnl) ? null : e.pnl, status: e.status };
+    saveTrades(); renderWatchlist(); renderSetups(); render(); if (selId !== null) showDetail(selId, false);
+}
+function removeTrade(id) { TRADES = TRADES.filter(x => x.id !== id); saveTrades(); renderWatchlist(); renderSetups(); render(); if (selId !== null) showDetail(selId, false); }
+function pnlHtml(v, cur) { if (v === null || isNaN(v)) return '<span class="mut">–</span>'; return `<span class="${v >= 0 ? 'g' : 'r'}">${v >= 0 ? '+' : ''}${nf(v)} ${cur}</span>`; }
+function renderWatchlist() {
+    const open = TRADES.filter(t => !t.closed), closed = TRADES.filter(t => t.closed);
+    F('wl-body').innerHTML = open.length ? open.map(t => { const e = evalTrade(t); return `<tr>
+        <td class="l"><span class="pair"><span class="lg">Long ${esc(t.long)}</span><span class="sep">/</span><span class="sh">Short ${esc(t.short)}</span></span><span class="sub">${esc(t.nl)} / ${esc(t.ns)} · ${esc(t.sector)}</span></td>
+        <td class="l">${t.entryDate}<span class="sub">z = ${fmt(t.entryZ)} · Stop ${fmt(t.zstop,1)}</span></td>
+        <td class="l">${t.nL ? `<span class="lg">${nf(t.nL)}</span> × ${esc(t.long)}<br><span class="sh">${nf(t.nS)}</span> × ${esc(t.short)}` : '–'}<span class="sub">${t.notL ? nf(t.notL) + ' / ' + nf(t.notS) + ' ' + t.disp : ''}</span></td>
+        <td class="${e.zc === null ? 'mut' : zClass(e.zc)}">${e.zc === null ? '–' : fmt(e.zc)}</td>
+        <td>${isNaN(e.progress) ? '–' : fmt(Math.max(-99, Math.min(199, e.progress*100)),0) + '%'}${isNaN(e.progress) ? '' : bar(Math.max(0, e.progress*100), 100, 'var(--blue)')}</td>
+        <td>${pnlHtml(e.pnl, t.disp)}</td>
+        <td><span class="${e.days >= e.limit ? 'r' : 'dim'}">${e.days} / ~${e.limit}</span></td>
+        <td class="l"><span class="st ${e.status}">${e.label}</span><span class="why">${e.why}</span></td>
+        <td class="l"><button class="wlbtn sm" data-close="${t.id}">Schließen</button> <button class="wlbtn sm red" data-del="${t.id}">✕</button></td></tr>`; }).join('')
+        : `<tr><td colspan="9" class="l mut">Noch keine Trades. Über „+ Watchlist" bei einem Setup, in der Tabelle oder in der Detailansicht aufnehmen – mit den gerade eingestellten Stückzahlen und dem Stop.</td></tr>`;
+    F('wl-closed').innerHTML = closed.length ? closed.map(t => `<tr>
+        <td class="l"><span class="pair"><span class="lg">Long ${esc(t.long)}</span><span class="sep">/</span><span class="sh">Short ${esc(t.short)}</span></span></td>
+        <td class="l">${t.entryDate}</td><td class="l">${t.closed.date}<span class="sub">${t.closed.status || ''}</span></td>
+        <td>${fmt(t.entryZ)} → ${t.closed.z === null ? '–' : fmt(t.closed.z)}</td><td>${pnlHtml(t.closed.pnl, t.disp)}</td>
+        <td class="l"><button class="wlbtn sm red" data-del="${t.id}">✕</button></td></tr>`).join('')
+        : '<tr><td colspan="6" class="l mut">Keine geschlossenen Trades.</td></tr>';
+    document.querySelectorAll('#wl [data-close]').forEach(b => b.addEventListener('click', () => closeTrade(+b.dataset.close)));
+    document.querySelectorAll('#wl [data-del]').forEach(b => b.addEventListener('click', () => { if (confirm('Trade aus der Watchlist entfernen?')) removeTrade(+b.dataset.del); }));
+}
+F('wl-export').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(TRADES, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'pairs_watchlist_' + M.data_date + '.json'; a.click();
+});
+F('wl-import').addEventListener('change', ev => {
+    const f = ev.target.files[0]; if (!f) return;
+    f.text().then(txt => { try { const arr = JSON.parse(txt); if (!Array.isArray(arr)) throw 0;
+        const ids = new Set(TRADES.map(t => t.id)); arr.forEach(t => { if (t && t.long && t.short && !ids.has(t.id)) TRADES.push(t); });
+        saveTrades(); renderWatchlist(); renderSetups(); render(); } catch (e) { alert('Datei konnte nicht gelesen werden.'); } ev.target.value = ''; });
+});
+renderSetups();
+renderWatchlist();
 
 render();
 if (setups.length) showDetail(setups[0].id, false); else if (P.length) showDetail(P[0].id, false);

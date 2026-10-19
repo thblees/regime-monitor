@@ -222,6 +222,21 @@ def quality_score(p, corr, hl, drift, h):
     return s_coint + s_corr + s_hl + s_drift + s_hurst
 
 
+def track_pair(a, b, pa, pb):
+    """Minimalstatistik für die Watchlist: Regression b ~ a, aktueller z, Spread-σ, Half-Life."""
+    df = pd.concat([pa, pb], axis=1, keys=["a", "b"]).ffill(limit=3).dropna().tail(CFG["coint_window"])
+    if len(df) < CFG["min_overlap"]:
+        return None
+    la, lb = np.log(df["a"]), np.log(df["b"])
+    beta, alpha = np.polyfit(la.values, lb.values, 1)
+    resid = lb - (alpha + beta * la)
+    sd = resid.std(ddof=1)
+    if not (sd > 0):
+        return None
+    return {"dep": b, "z": float(resid.iloc[-1] / sd), "sd": float(sd * 100), "beta": float(beta),
+            "hl": half_life(resid)}
+
+
 def analyze_pair(a, b, pa, pb):
     """pa, pb: Preis-Serien (bereits in gemeinsamer Währung, falls nötig)."""
     from statsmodels.tsa.stattools import coint
@@ -344,6 +359,7 @@ def main():
         sectors = {k: v for k, v in UNIVERSE.items() if k in wanted}
 
     results, n_tested = [], 0
+    track = {}   # "A|B" (alphabetisch) -> Tracking-Daten für die Watchlist, für alle testbaren Paare
     for sector, members in sectors.items():
         avail = [t for t, _ in members if t in px.columns]
         n_pairs = len(avail) * (len(avail) - 1) // 2
@@ -356,8 +372,16 @@ def main():
             except Exception as e:  # einzelne Ausreißer nicht die ganze Berechnung kosten lassen
                 log(f"  Fehler {a}/{b}: {e}")
                 continue
+            key = "|".join(sorted([a, b]))
             if r is None:
+                try:
+                    t = track_pair(a, b, src[a], src[b])
+                except Exception:
+                    t = None
+                if t:
+                    track[key] = t
                 continue
+            track[key] = {"dep": r["b"], "z": r["z"], "sd": r["spread_sd_pct"], "beta": r["beta"], "hl": r["half_life"]}
             r["sector"] = sector
             r["fx"] = (not same_cur)
             r["fx_converted"] = (not same_cur) and fx_ok
@@ -416,7 +440,7 @@ def main():
         pairs_json.append(d)
 
     universe_json = [{"t": t, "name": names[t], "sector": s, "region": region_of(t), "cur": currency_of(t),
-                      "asset": asset_of(t), "ok": t in px.columns}
+                      "asset": asset_of(t), "mult": multiplier_of(t), "ok": t in px.columns}
                      for s, members in UNIVERSE.items() for t, _ in members]
 
     meta = {
@@ -431,7 +455,10 @@ def main():
         "fx_last": {cur: float(fx[tk].dropna().iloc[-1]) for cur, tk in FX_TICKERS.items()
                     if not fx.empty and tk in fx.columns and fx[tk].notna().any()},
     }
-    payload = {"meta": meta, "pairs": pairs_json, "universe": universe_json}
+    track_json = {k: [v["dep"], fnum(v["z"], 2), fnum(v["sd"], 2), fnum(v["beta"], 3), fnum(v["hl"], 1)]
+                  for k, v in track.items()}
+    last_px = {t: fnum(px[t].dropna().iloc[-1], 4) for t in px.columns if px[t].notna().any()}
+    payload = {"meta": meta, "pairs": pairs_json, "universe": universe_json, "track": track_json, "last_px": last_px}
 
     os.makedirs(args.out_dir, exist_ok=True)
     with open(os.path.join(args.out_dir, "pairs_data.json"), "w", encoding="utf-8") as f:
