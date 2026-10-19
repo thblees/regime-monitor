@@ -341,6 +341,7 @@ td.num {{ text-align:right; }}
 <div class="container">
 
 <a href="https://thblees.github.io/trading-command-center/" class="back-link">← Zurück zum Command Center</a>
+<a href="pairs.html" class="back-link" style="margin-left:20px">Pairs-Trading-Screener →</a>
 
 <div class="header">
     <div class="title-block">

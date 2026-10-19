@@ -73,3 +73,40 @@ Keine Anlageberatung. Modellierungs-Tool zur Beobachtung von Marktphasen. Markts
 ---
 
 Thomas Bleeß · [meine-geldseite.de](https://www.meine-geldseite.de)
+
+---
+
+# Pairs-Trading-Screener
+
+Zweites Dashboard im selben Repository: findet Aktienpaare, die sich für Pairs Trades (Long/Short) eignen.
+
+**Live-Dashboard:** [thblees.github.io/regime-monitor/pairs.html](https://thblees.github.io/regime-monitor/pairs.html)
+
+## Was der Screener macht
+
+- Universum: ~400 Aktien aus DAX/MDAX, Euro Stoxx 50 + UK/Schweiz, S&P 100 + Sektorergänzungen in 25 Sektoren, dazu 26 Rohstoff-Futures (Energie, Metalle, Agrar) und 17 Index-Futures bzw. Kassa-Indizes (`pairs_universe.py`)
+- Paare nur innerhalb eines Sektors bzw. einer Futures-Gruppe (~3.600 Paare), Cross-Currency-Paare werden in EUR umgerechnet und als **FX** markiert
+- Futures: Yahoo-Front-Month-Kontrakte (`CL=F`, `GC=F`, `ES=F` …, nicht roll-adjustiert), europäische/asiatische Indizes als Kassa-Index; Kontrakt-Multiplikatoren sind hinterlegt, die Detailansicht rechnet die Hedge Ratio in Kontrakte um
+- Pro Paar: Korrelation der Tagesrenditen (252d), Engle-Granger-Kointegrationstest (504d), Hedge Ratio β, Half-Life, Hurst-Exponent, Beta-Stabilität, Nulldurchgänge, aktueller Spread-Z-Score
+- Qualitäts-Score (0–100) × Signal (|z|/2) = Gesamt-Score; Status **SETUP** (|z| ≥ 2), **WATCH** (|z| ≥ 1.5), **EXTREM** (|z| ≥ 4, Strukturbruch prüfen)
+- Dashboard mit Filtern (Region, Sektor, Status, Korrelation, p-Wert, Half-Life), sortierbarer Tabelle und Detail-Charts (Z-Score, indexierte Kurse)
+
+## Dateien
+
+| Datei | Zweck |
+|---|---|
+| `pairs_universe.py` | Aktienuniversum nach Sektoren, Währungs-/Regions-Zuordnung |
+| `pairs_screener.py` | Datenabruf, Statistik, erzeugt `pairs_data.json` und `pairs.html` |
+| `pairs_template.html` | HTML/JS-Vorlage des Dashboards (Daten werden eingebettet) |
+| `.github/workflows/pairs.yml` | Täglicher Lauf Di–Sa 22:30 UTC |
+
+## Manuell ausführen
+
+```bash
+pip install yfinance pandas numpy statsmodels scipy
+python pairs_screener.py              # Daten via Yahoo Finance, ~2–4 Minuten
+python pairs_screener.py --offline    # nur lokaler Cache (cache/prices_cache.csv, cache/fx_cache.csv)
+python pairs_screener.py --sectors "Autos,Banken"   # Teilmenge zum Testen
+```
+
+Schwellen und Fenster stehen oben in `pairs_screener.py` im `CFG`-Dict. Universum erweitern: Aktien (Yahoo-Format) in `pairs_universe.py` unter `UNIVERSE` zum passenden Sektor hinzufügen, Futures/Indizes unter `FUTURES` mit Währung und Multiplikator.
