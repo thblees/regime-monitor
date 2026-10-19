@@ -55,6 +55,16 @@ body { background:var(--bg); color:var(--text); font-family:'Inter Tight',sans-s
 .setup.watch .tag { background:rgba(251,191,36,0.15); color:var(--yellow); }
 .setup.extrem .tag { background:rgba(239,68,68,0.15); color:var(--red); }
 .empty { color:var(--text-muted); font-size:13px; padding:8px 0; }
+.setup .size { margin-top:8px; padding-top:8px; border-top:1px solid var(--border); font-family:var(--mono); font-size:11.5px; color:var(--text-dim); line-height:1.6; }
+.setup .size b { color:var(--text); }
+.capbar { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px; padding:12px 14px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:8px; }
+.capbar .note { font-size:12px; color:var(--text-muted); max-width:640px; align-self:center; }
+.sizebox { background:var(--bg-elevated); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:18px; display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.sizebox .leg { font-family:var(--mono); font-size:13px; line-height:1.7; }
+.sizebox .leg .h { font-size:10px; text-transform:uppercase; letter-spacing:0.12em; color:var(--text-muted); }
+.sizebox .leg .n { font-size:26px; font-weight:700; }
+.sizebox .sum { grid-column:1/-1; font-size:12px; color:var(--text-dim); border-top:1px solid var(--border); padding-top:8px; }
+@media (max-width:700px) { .sizebox { grid-template-columns:1fr; } }
 
 .filters { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px; }
 .f { display:flex; flex-direction:column; gap:3px; }
@@ -149,6 +159,11 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
 
 <div class="card">
     <div class="card-title"><span>Beste Setups heute</span><span class="hint">Qualität ≥ <span id="qmin"></span> und |z| ≥ <span id="zsetup"></span> (grün) bzw. ≥ <span id="zwatch"></span> (gelb) · Klick öffnet Details</span></div>
+    <div class="capbar">
+        <div class="f"><label>Kapital je Seite</label><input id="cap" type="number" step="1000" min="100" value="10000"></div>
+        <div class="f"><label>Gewichtung</label><select id="wmode"><option value="beta">Hedge Ratio β (empfohlen)</option><option value="equal">Gleiches Kapital (1 : 1)</option></select></div>
+        <div class="note">Stückzahlen gelten für dieses Kapital auf der Long-Seite, in der Währung des Paares (bei FX-Paaren in EUR, Kurse mit aktuellem Wechselkurs umgerechnet). Bei „Hedge Ratio β" ist die Short-Seite β-mal so groß wie die Long-Seite – so ist der Spread neutral; bei β nahe 1 sind beide Seiten praktisch gleich.</div>
+    </div>
     <div class="setups" id="setups"></div>
 </div>
 
@@ -160,6 +175,7 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
         </div>
         <div class="trade" id="d-trade"></div>
     </div>
+    <div class="sizebox" id="d-size"></div>
     <div class="facts" id="d-facts"></div>
     <div class="charts">
         <div>
@@ -229,6 +245,7 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
     </div></details>
     <details><summary>Wie setze ich einen Trade um?</summary><div class="body">
         <p>Die Hedge Ratio β bezieht sich auf Log-Kurse und entspricht näherungsweise dem <b>Verhältnis der Positionsgrößen in Geld</b>: Für 10.000 € in Aktie A (Long) werden ca. β × 10.000 € in Aktie B (Short) gestellt. Bei β nahe 1 ist der Trade geldneutral.</p>
+        <p><b>Stückzahlen ablesen:</b> Oben bei „Beste Setups" das Kapital je Seite eintragen (z.&nbsp;B. 10.000). Jede Setup-Karte, die Tabellenspalte „Kaufen / Verkaufen" und die Detailansicht zeigen dann direkt: <i>Kaufe N Stück Long-Titel, verkaufe M Stück Short-Titel</i>. Die Rechnung: N = Kapital ÷ Kurs Long (abgerundet), M = (N × Kurs Long × β) ÷ Kurs Short (gerundet). Mit der Gewichtung „Gleiches Kapital" wird β durch 1 ersetzt, beide Seiten sind dann gleich groß. Bei Futures gilt die Rechnung je Kontraktwert (Kurs × Multiplikator), mindestens 1 Kontrakt je Seite.</p>
         <p>Typische Regeln: Einstieg bei |z| ≥ 2, Ausstieg bei z ≈ 0 (oder ±0.5), Stop bei |z| ≥ 3.5–4 oder nach dem 2- bis 3-fachen der Half-Life ohne Konvergenz. Vor jedem Trade: Nachrichten beider Titel prüfen (Earnings-Termine, Übernahmen, Dividenden-Ex-Tage), Shortbarkeit und Leihkosten klären.</p>
         <p><b>Keine Anlageberatung.</b> Der Screener zeigt statistische Kandidaten, keine Handelsempfehlungen. Kointegration kann jederzeit brechen (Lucas-Kritik), historische Stationarität garantiert nichts für die Zukunft.</p>
     </div></details>
@@ -267,8 +284,51 @@ function pClass(p) { return p < 0.01 ? 'g' : p < 0.05 ? 'y' : 'dim'; }
 function hlClass(h) { return h === null ? 'mut' : (h >= 5 && h <= 40) ? 'g' : h <= 60 ? 'y' : 'r'; }
 function bar(v, max, col) { const w = Math.max(0, Math.min(100, v / max * 100)); return `<span class="bar"><i style="width:${w}%;background:${col}"></i></span>`; }
 
+// ---- Positionsgrößen ----
+let CAP = 10000, WMODE = 'beta';
+try { CAP = +localStorage.getItem('pairs_cap') || 10000; WMODE = localStorage.getItem('pairs_wmode') || 'beta'; } catch (e) {}
+document.getElementById('cap').value = CAP; document.getElementById('wmode').value = WMODE;
+const FXL = M.fx_last || {};
+const curLabel = c => c === 'GBp' ? 'GBP' : c;
+// Umrechnung Lokalwährung -> Anzeigewährung (Paarwährung oder EUR bei FX-Paaren)
+function toDisp(px, cur, disp) {
+    const scale = cur === 'GBp' ? 0.01 : 1;
+    if (curLabel(cur) === disp) return px * scale;
+    const r = FXL[cur]; return r ? px * scale / r : NaN;   // nach EUR
+}
+function sizing(p, cap, mode) {
+    const isL = p.long === p.a;
+    const pxL = isL ? p.pxa : p.pxb, pxS = isL ? p.pxb : p.pxa;
+    const cL = isL ? p.ca : p.cb, cS = isL ? p.cb : p.ca;
+    const mL = (isL ? p.ma : p.mb) || 1, mS = (isL ? p.mb : p.ma) || 1;
+    const disp = p.ca === p.cb ? curLabel(p.ca) : 'EUR';
+    const ratio = mode === 'equal' ? 1 : (isL ? p.beta : 1 / p.beta);   // Short-Notional je 1 Long-Notional
+    const vL = toDisp(pxL, cL, disp) * mL, vS = toDisp(pxS, cS, disp) * mS;   // Wert je Stück/Kontrakt in Anzeigewährung
+    if (!(vL > 0) || !(vS > 0)) return null;
+    const fut = p.asset !== 'Aktie';
+    let nL = fut ? Math.max(1, Math.round(cap / vL)) : Math.floor(cap / vL);
+    if (nL < 1) nL = 1;
+    const notL = nL * vL;
+    let nS = Math.round(notL * ratio / vS); if (nS < 1) nS = 1;
+    const notS = nS * vS;
+    return { nL, nS, vL, vS, notL, notS, disp, ratio, fut, unit: fut ? 'Kontrakt(e)' : 'Stück', cL, cS, pxL, pxS, mL, mS };
+}
+const nf = (x, d=0) => Number(x).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
+function sizeLine(p) {
+    const z = sizing(p, CAP, WMODE); if (!z) return '<div class="size mut">Keine Kursdaten für die Stückzahl.</div>';
+    return `<div class="size">Bei ${nf(CAP)} ${z.disp}: <b class="lg">Kaufe ${nf(z.nL)} ${z.unit} ${esc(p.long)}</b> (≈ ${nf(z.notL)} ${z.disp})<br><b class="sh">Verkaufe ${nf(z.nS)} ${z.unit} ${esc(p.short)}</b> (≈ ${nf(z.notS)} ${z.disp})</div>`;
+}
+function refreshAll() {
+    CAP = Math.max(100, +document.getElementById('cap').value || 10000); WMODE = document.getElementById('wmode').value;
+    try { localStorage.setItem('pairs_cap', CAP); localStorage.setItem('pairs_wmode', WMODE); } catch (e) {}
+    renderSetups(); render(); if (selId !== null) showDetail(selId, false);
+}
+document.getElementById('cap').addEventListener('input', refreshAll);
+document.getElementById('wmode').addEventListener('change', refreshAll);
+
 // Setups
 const setups = P.filter(p => p.status === 'SETUP' || p.status === 'WATCH').sort((a,b) => b.score - a.score).slice(0, 9);
+function renderSetups() {
 document.getElementById('setups').innerHTML = setups.length ? setups.map(p => `
     <div class="setup ${p.status.toLowerCase()}" data-id="${p.id}">
         <span class="tag">${p.status}</span>
@@ -282,13 +342,17 @@ document.getElementById('setups').innerHTML = setups.length ? setups.map(p => `
             <div><span>Erw. Bew.</span><b>${fmt(p.move,1)}%</b></div>
             <div><span>Qualität</span><b>${fmt(p.q,0)}</b></div>
         </div>
+        ${sizeLine(p)}
     </div>`).join('') : '<div class="empty">Heute kein Paar mit Qualität ≥ ' + CFG.quality_min + ' und |z| ≥ ' + CFG.z_watch + '. Die Tabelle unten zeigt alle Kandidaten.</div>';
 document.querySelectorAll('.setup').forEach(el => el.addEventListener('click', () => showDetail(+el.dataset.id, true)));
+}
+renderSetups();
 
 // Tabelle
 const COLS = [
     {k:'status', l:'Status', cls:'l', r:p => `<span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? '·' : p.status}</span>`, v:p => ({SETUP:3,WATCH:2,EXTREM:1,'-':0})[p.status]},
     {k:'pair', l:'Paar (Long / Short)', cls:'l', r:p => `<span class="pair">${legsHtml(p)}</span>${p.fx ? '<span class="fxtag">FX</span>' : ''}<span class="sub">${esc(p.na)} / ${esc(p.nb)}</span>`, v:p => p.long + p.short},
+    {k:'size', l:'Kaufen / Verkaufen', cls:'l', r:p => { const z = sizing(p, CAP, WMODE); return z ? `<span class="lg">${nf(z.nL)}</span> <span class="mut">×</span> ${esc(p.long)}<br><span class="sh">${nf(z.nS)}</span> <span class="mut">×</span> ${esc(p.short)}` : '–'; }, v:p => p.score},
     {k:'sector', l:'Sektor', cls:'l', r:p => `${esc(p.sector)}<span class="sub">${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region}</span>`, v:p => p.sector},
     {k:'z', l:'Z-Score', r:p => `<span class="${zClass(p.z)}">${fmt(p.z)}</span>`, v:p => Math.abs(p.z)},
     {k:'dz', l:'Δz 5d', r:p => { const d = p.z5 === null ? null : p.z - p.z5; return `<span class="dim">${d === null ? '–' : (d > 0 ? '+' : '') + fmt(d)}</span>`; }, v:p => p.z5 === null ? 0 : Math.abs(p.z) - Math.abs(p.z5)},
@@ -346,21 +410,17 @@ function showDetail(id, scroll) {
     const nl = p.long === p.a ? p.na : p.nb, ns = p.short === p.a ? p.na : p.nb;
     F('d-meta').textContent = `${nl} / ${ns} · ${p.sector} · ${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region} · ${p.ca === p.cb ? p.ca : p.ca + ' / ' + p.cb + ' (Spread in EUR)'} · ${p.n} gemeinsame Handelstage · Stand ${p.last}`;
     const ratio = p.long === p.a ? p.beta : 1 / p.beta;  // Notional Short pro 1 Notional Long
-    const cur = p.ca === p.cb ? (p.ca === 'GBp' ? 'GBP' : p.ca) : 'EUR';
-    let sizing;
-    if (p.asset !== 'Aktie' && p.ma && p.mb) {
-        const mL = p.long === p.a ? p.ma : p.mb, mS = p.long === p.a ? p.mb : p.ma;
-        const pxL = p.long === p.a ? p.pxa : p.pxb, pxS = p.long === p.a ? p.pxb : p.pxa;
-        const cL = p.long === p.a ? p.ca : p.cb, cS = p.long === p.a ? p.cb : p.ca;
-        const notL = mL * pxL, notS = mS * pxS;
-        // Kontraktzahl Short je 1 Kontrakt Long; bei Fremdwährung Notionals grob über das Verhältnis der Notionals in Lokalwährung
-        const nShort = notL * ratio / notS;
-        const ganz = nShort >= 1 ? `${Math.round(nShort)} Short je 1 Long` : `${Math.round(1 / nShort)} Long je 1 Short`;
-        sizing = `Für <b>1 Kontrakt Long ${esc(p.long)}</b> (Notional ≈ ${fmt(notL,0)} ${cL}, Multiplikator ${mL}) ca. <b>${fmt(nShort,2)} Kontrakte Short ${esc(p.short)}</b> (Notional ≈ ${fmt(notS,0)} ${cS} je Kontrakt) – ganzzahlig etwa <b>${ganz}</b>${cL !== cS ? '; unterschiedliche Währungen, Notionals vor dem Trade in eine Währung umrechnen' : ''}.`;
+    F('d-trade').innerHTML = `<b>Trade-Idee:</b> Spread ${p.z > 0 ? 'über' : 'unter'} dem Mittel (z = <b class="${zClass(p.z)}">${fmt(p.z)}</b>): <b>${esc(p.long)}</b> ist relativ zu <b>${esc(p.short)}</b> zu billig → Long ${esc(p.long)}, Short ${esc(p.short)}. Hedge Ratio β = ${fmt(p.beta,3)} (${esc(p.b)} ~ ${esc(p.a)}), d.h. Short-Seite ≈ ${fmt(ratio,2)} × Long-Seite. Erwartete Spread-Bewegung bis zum Mittel: <b>${fmt(p.move,1)}%</b>. Status: <span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? 'kein Signal' : p.status}</span>${Math.abs(p.z) >= CFG.z_extreme ? ' – <span class="r">Strukturbruch prüfen!</span>' : ''}`;
+    const z = sizing(p, CAP, WMODE);
+    if (!z) {
+        F('d-size').innerHTML = '<div class="sum">Keine aktuellen Kurse für die Stückzahlberechnung.</div>';
     } else {
-        sizing = `Für 10.000 ${cur} Long <b>${esc(p.long)}</b> ca. <b>${fmt(ratio*10000,0)} ${cur}</b> Short <b>${esc(p.short)}</b>.`;
+        const kurs = (px, c, m, v) => `Kurs ${nf(px, px < 10 ? 3 : 2)} ${curLabel(c)}${m > 1 ? ' × Multiplikator ' + nf(m) : ''}${curLabel(c) !== z.disp ? ' ≈ ' + nf(v / m, 2) + ' ' + z.disp : ''} je ${z.fut ? 'Kontrakt' : 'Stück'}`;
+        F('d-size').innerHTML = `
+            <div class="leg"><div class="h">Long · Kaufen</div><span class="n lg">${nf(z.nL)}</span> ${z.unit} <b>${esc(p.long)}</b><br><span class="mut">${kurs(z.pxL, z.cL, z.mL, z.vL)} · Summe ≈ ${nf(z.notL)} ${z.disp}</span></div>
+            <div class="leg"><div class="h">Short · Verkaufen</div><span class="n sh">${nf(z.nS)}</span> ${z.unit} <b>${esc(p.short)}</b><br><span class="mut">${kurs(z.pxS, z.cS, z.mS, z.vS)} · Summe ≈ ${nf(z.notS)} ${z.disp}</span></div>
+            <div class="sum">${z.fut && CAP < Math.min(z.vL, z.vS) ? '<span class="y">Hinweis: Ein Kontrakt ist mehr wert als das eingestellte Kapital – Kapital erhöhen oder Micro-Kontrakte nutzen.</span><br>' : ''}Basis: ${nf(CAP)} ${z.disp} auf der Long-Seite, Gewichtung ${WMODE === 'equal' ? 'gleiches Kapital (1 : 1)' : 'Hedge Ratio β (Short = ' + fmt(z.ratio,2) + ' × Long)'} · tatsächliches Verhältnis Short/Long = ${fmt(z.notS / z.notL, 2)}${z.fut ? ' · Kontrakte sind ganzzahlig gerundet; Micro-Kontrakte erlauben feinere Verhältnisse' : ''}${p.fx ? ' · Cross-Currency-Paar: Beträge in EUR umgerechnet, Währungsrisiko bleibt' : ''}. Kapital und Gewichtung oben bei „Beste Setups" einstellbar.</div>`;
     }
-    F('d-trade').innerHTML = `<b>Trade-Idee:</b> Spread ${p.z > 0 ? 'über' : 'unter'} dem Mittel (z = <b class="${zClass(p.z)}">${fmt(p.z)}</b>). ${sizing} Hedge Ratio β = ${fmt(p.beta,3)} für ${esc(p.b)} ~ ${esc(p.a)}. Erwartete Spread-Bewegung bis zum Mittel: <b>${fmt(p.move,1)}%</b>. Status: <span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? 'kein Signal' : p.status}</span>${Math.abs(p.z) >= CFG.z_extreme ? ' – <span class="r">Strukturbruch prüfen!</span>' : ''}`;
     F('d-facts').innerHTML = [
         ['Z-Score', fmt(p.z), 'vor 5d ' + fmt(p.z5) + ' · vor 20d ' + fmt(p.z20), zClass(p.z)],
         ['p-Wert (EG)', fmt(p.p,4), p.p < 0.01 ? 'sehr stark' : p.p < 0.05 ? 'kointegriert' : 'schwach', pClass(p.p)],

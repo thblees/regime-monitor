@@ -425,6 +425,9 @@ def main():
         "n_setup": int(sum(r["status"] == "SETUP" for r in results)),
         "n_watch": int(sum(r["status"] == "WATCH" for r in results)),
         "fx_ok": bool(fx_ok), "cfg": CFG, "sectors": list(UNIVERSE.keys()),
+        # letzte EUR-Wechselkurse je Währung (Preis_EUR = Preis_lokal * Skala / Kurs)
+        "fx_last": {cur: float(fx[tk].dropna().iloc[-1]) for cur, tk in FX_TICKERS.items()
+                    if not fx.empty and tk in fx.columns and fx[tk].notna().any()},
     }
     payload = {"meta": meta, "pairs": pairs_json, "universe": universe_json}
 
