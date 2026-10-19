@@ -108,6 +108,9 @@ tr.row.sel td { background:rgba(96,165,250,0.12); }
 .setup .act { margin-top:8px; text-align:right; }
 .setup .exit { font-family:var(--mono); font-size:10.5px; color:var(--text-muted); margin-top:6px; }
 .wl td { white-space:normal; }
+.wl tr.wlrow { cursor:pointer; }
+.wl tr.wlrow:hover td { background:rgba(96,165,250,0.06); }
+.wl .nodata { color:var(--text-muted); font-size:11px; }
 .wl .st.HALTEN { background:rgba(96,165,250,0.15); color:var(--blue); }
 .wl .st.TEILGEWINN { background:rgba(251,191,36,0.15); color:var(--yellow); }
 .wl .st.ZIEL { background:rgba(74,222,128,0.15); color:var(--green); }
@@ -483,7 +486,8 @@ function showDetail(id, scroll) {
     const d = F('detail'); d.classList.add('open');
     F('d-title').innerHTML = `<span class="lg">Long ${esc(p.long)}</span> <span class="mut">/</span> <span class="sh">Short ${esc(p.short)}</span>`;
     const nl = p.long === p.a ? p.na : p.nb, ns = p.short === p.a ? p.na : p.nb;
-    F('d-meta').textContent = `${nl} / ${ns} · ${p.sector} · ${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region} · ${p.ca === p.cb ? p.ca : p.ca + ' / ' + p.cb + ' (Spread in EUR)'} · ${p.n} gemeinsame Handelstage · Stand ${p.last}`;
+    const wlT = TRADES.find(t => !t.closed && t.long === p.long && t.short === p.short);
+    F('d-meta').textContent = `${wlT ? 'In Watchlist seit ' + wlT.entryDate + ' (Einstieg z = ' + fmt(wlT.entryZ) + ') · ' : ''}${nl} / ${ns} · ${p.sector} · ${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region} · ${p.ca === p.cb ? p.ca : p.ca + ' / ' + p.cb + ' (Spread in EUR)'} · ${p.n} gemeinsame Handelstage · Stand ${p.last}`;
     const ratio = p.long === p.a ? p.beta : 1 / p.beta;  // Notional Short pro 1 Notional Long
     F('d-trade').innerHTML = `<b>Trade-Idee:</b> Spread ${p.z > 0 ? 'über' : 'unter'} dem Mittel (z = <b class="${zClass(p.z)}">${fmt(p.z)}</b>): <b>${esc(p.long)}</b> ist relativ zu <b>${esc(p.short)}</b> zu billig → Long ${esc(p.long)}, Short ${esc(p.short)}. Hedge Ratio β = ${fmt(p.beta,3)} (${esc(p.b)} ~ ${esc(p.a)}), d.h. Short-Seite ≈ ${fmt(ratio,2)} × Long-Seite. Erwartete Spread-Bewegung bis zum Mittel: <b>${fmt(p.move,1)}%</b>. Status: <span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? 'kein Signal' : p.status}</span>${Math.abs(p.z) >= CFG.z_extreme ? ' – <span class="r">Strukturbruch prüfen!</span>' : ''}<br><b>Exit-Plan:</b> ${exitPlan(p)}<div style="margin-top:8px">${wlButton(p)}</div>`;
     F('d-trade').querySelectorAll('.wlbtn').forEach(el => el.addEventListener('click', () => addTrade(+el.dataset.pid)));
@@ -603,7 +607,7 @@ function removeTrade(id) { TRADES = TRADES.filter(x => x.id !== id); saveTrades(
 function pnlHtml(v, cur) { if (v === null || isNaN(v)) return '<span class="mut">–</span>'; return `<span class="${v >= 0 ? 'g' : 'r'}">${v >= 0 ? '+' : ''}${nf(v)} ${cur}</span>`; }
 function renderWatchlist() {
     const open = TRADES.filter(t => !t.closed), closed = TRADES.filter(t => t.closed);
-    F('wl-body').innerHTML = open.length ? open.map(t => { const e = evalTrade(t); return `<tr>
+    F('wl-body').innerHTML = open.length ? open.map(t => { const e = evalTrade(t); return `<tr class="wlrow" data-tid="${t.id}" title="Klick öffnet die Detailansicht mit Charts">
         <td class="l"><span class="pair"><span class="lg">Long ${esc(t.long)}</span><span class="sep">/</span><span class="sh">Short ${esc(t.short)}</span></span><span class="sub">${esc(t.nl)} / ${esc(t.ns)} · ${esc(t.sector)}</span></td>
         <td class="l">${t.entryDate}<span class="sub">z = ${fmt(t.entryZ)} · Stop ${fmt(t.zstop,1)}</span></td>
         <td class="l">${t.nL ? `<span class="lg">${nf(t.nL)}</span> × ${esc(t.long)}<br><span class="sh">${nf(t.nS)}</span> × ${esc(t.short)}` : '–'}<span class="sub">${t.notL ? nf(t.notL) + ' / ' + nf(t.notS) + ' ' + t.disp : ''}</span></td>
@@ -614,12 +618,19 @@ function renderWatchlist() {
         <td class="l"><span class="st ${e.status}">${e.label}</span><span class="why">${e.why}</span></td>
         <td class="l"><button class="wlbtn sm" data-close="${t.id}">Schließen</button> <button class="wlbtn sm red" data-del="${t.id}">✕</button></td></tr>`; }).join('')
         : `<tr><td colspan="9" class="l mut">Noch keine Trades. Über „+ Watchlist" bei einem Setup, in der Tabelle oder in der Detailansicht aufnehmen – mit den gerade eingestellten Stückzahlen und dem Stop.</td></tr>`;
-    F('wl-closed').innerHTML = closed.length ? closed.map(t => `<tr>
+    F('wl-closed').innerHTML = closed.length ? closed.map(t => `<tr class="wlrow" data-tid="${t.id}" title="Klick öffnet die Detailansicht mit Charts">
         <td class="l"><span class="pair"><span class="lg">Long ${esc(t.long)}</span><span class="sep">/</span><span class="sh">Short ${esc(t.short)}</span></span></td>
         <td class="l">${t.entryDate}</td><td class="l">${t.closed.date}<span class="sub">${t.closed.status || ''}</span></td>
         <td>${fmt(t.entryZ)} → ${t.closed.z === null ? '–' : fmt(t.closed.z)}</td><td>${pnlHtml(t.closed.pnl, t.disp)}</td>
         <td class="l"><button class="wlbtn sm red" data-del="${t.id}">✕</button></td></tr>`).join('')
         : '<tr><td colspan="6" class="l mut">Keine geschlossenen Trades.</td></tr>';
+    document.querySelectorAll('#wl tr.wlrow').forEach(tr => tr.addEventListener('click', e => {
+        if (e.target.closest('.wlbtn')) return;
+        const t = TRADES.find(x => x.id === +tr.dataset.tid); if (!t) return;
+        const pr = P.find(p => (p.a === t.a && p.b === t.b) || (p.a === t.b && p.b === t.a));
+        if (pr) showDetail(pr.id, true);
+        else alert('Dieses Paar ist heute nicht mehr unter den berichteten Paaren (p-Wert über ' + CFG.report_max_pvalue + '), daher gibt es keine Chart-Ansicht. Die Watchlist-Zeile wird trotzdem weiter bewertet.');
+    }));
     document.querySelectorAll('#wl [data-close]').forEach(b => b.addEventListener('click', () => closeTrade(+b.dataset.close)));
     document.querySelectorAll('#wl [data-del]').forEach(b => b.addEventListener('click', () => { if (confirm('Trade aus der Watchlist entfernen?')) removeTrade(+b.dataset.del); }));
 }
