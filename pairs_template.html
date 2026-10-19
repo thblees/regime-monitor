@@ -160,9 +160,12 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
 <div class="card">
     <div class="card-title"><span>Beste Setups heute</span><span class="hint">Qualität ≥ <span id="qmin"></span> und |z| ≥ <span id="zsetup"></span> (grün) bzw. ≥ <span id="zwatch"></span> (gelb) · Klick öffnet Details</span></div>
     <div class="capbar">
-        <div class="f"><label>Kapital je Seite</label><input id="cap" type="number" step="1000" min="100" value="10000"></div>
+        <div class="f"><label>Positionsgröße nach</label><select id="smode"><option value="risk">Risiko je Trade</option><option value="cap">Kapital je Seite</option></select></div>
+        <div class="f" id="f-risk"><label>Risiko je Trade</label><input id="risk" type="number" step="100" min="10" value="500"></div>
+        <div class="f" id="f-zstop"><label>Stop bei |z| =</label><input id="zstop" type="number" step="0.25" min="1" max="8" value="3.5"></div>
+        <div class="f" id="f-cap" style="display:none"><label>Kapital je Seite</label><input id="cap" type="number" step="1000" min="100" value="10000"></div>
         <div class="f"><label>Gewichtung</label><select id="wmode"><option value="beta">Hedge Ratio β (empfohlen)</option><option value="equal">Gleiches Kapital (1 : 1)</option></select></div>
-        <div class="note">Stückzahlen gelten für dieses Kapital auf der Long-Seite, in der Währung des Paares (bei FX-Paaren in EUR, Kurse mit aktuellem Wechselkurs umgerechnet). Bei „Hedge Ratio β" ist die Short-Seite β-mal so groß wie die Long-Seite – so ist der Spread neutral; bei β nahe 1 sind beide Seiten praktisch gleich.</div>
+        <div class="note" id="capnote"></div>
     </div>
     <div class="setups" id="setups"></div>
 </div>
@@ -245,7 +248,8 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
     </div></details>
     <details><summary>Wie setze ich einen Trade um?</summary><div class="body">
         <p>Die Hedge Ratio β bezieht sich auf Log-Kurse und entspricht näherungsweise dem <b>Verhältnis der Positionsgrößen in Geld</b>: Für 10.000 € in Aktie A (Long) werden ca. β × 10.000 € in Aktie B (Short) gestellt. Bei β nahe 1 ist der Trade geldneutral.</p>
-        <p><b>Stückzahlen ablesen:</b> Oben bei „Beste Setups" das Kapital je Seite eintragen (z.&nbsp;B. 10.000). Jede Setup-Karte, die Tabellenspalte „Kaufen / Verkaufen" und die Detailansicht zeigen dann direkt: <i>Kaufe N Stück Long-Titel, verkaufe M Stück Short-Titel</i>. Die Rechnung: N = Kapital ÷ Kurs Long (abgerundet), M = (N × Kurs Long × β) ÷ Kurs Short (gerundet). Mit der Gewichtung „Gleiches Kapital" wird β durch 1 ersetzt, beide Seiten sind dann gleich groß. Bei Futures gilt die Rechnung je Kontraktwert (Kurs × Multiplikator), mindestens 1 Kontrakt je Seite.</p>
+        <p><b>Positionsgröße nach Risiko (Standard):</b> Oben bei „Beste Setups" das Risiko je Trade (z.&nbsp;B. 500) und den Stop als Z-Score (Standard 3,5) eintragen. Der Spread bewegt sich pro z-Einheit um seine Standardabweichung σ (in Prozent der Long-Summe, in der Detailansicht als „Spread-σ"). Wer bei |z| = 2,0 einsteigt und bei 3,5 aussteigt, verliert dabei 1,5 × σ der Long-Summe. Die Long-Summe ist deshalb Risiko ÷ (1,5 × σ), die Short-Seite folgt über β. Beispiel: σ = 2,4 % → Spread-Weg 3,6 % → bei 500 € Risiko eine Long-Summe von rund 13.900 €. Die Detailansicht zeigt diese Herleitung und das tatsächliche Risiko nach Rundung der Stückzahlen. Das Modell nimmt an, dass der Stop am Z-Score ausgeführt wird; Kurslücken, Gebühren, Leihkosten und Währungseffekte kommen hinzu.</p>
+        <p><b>Positionsgröße nach Kapital:</b> Alternativ das Kapital je Seite eintragen (z.&nbsp;B. 10.000). Jede Setup-Karte, die Tabellenspalte „Kaufen / Verkaufen" und die Detailansicht zeigen dann direkt: <i>Kaufe N Stück Long-Titel, verkaufe M Stück Short-Titel</i>. Die Rechnung: N = Kapital ÷ Kurs Long (abgerundet), M = (N × Kurs Long × β) ÷ Kurs Short (gerundet). Mit der Gewichtung „Gleiches Kapital" wird β durch 1 ersetzt, beide Seiten sind dann gleich groß. Bei Futures gilt die Rechnung je Kontraktwert (Kurs × Multiplikator), mindestens 1 Kontrakt je Seite.</p>
         <p>Typische Regeln: Einstieg bei |z| ≥ 2, Ausstieg bei z ≈ 0 (oder ±0.5), Stop bei |z| ≥ 3.5–4 oder nach dem 2- bis 3-fachen der Half-Life ohne Konvergenz. Vor jedem Trade: Nachrichten beider Titel prüfen (Earnings-Termine, Übernahmen, Dividenden-Ex-Tage), Shortbarkeit und Leihkosten klären.</p>
         <p><b>Keine Anlageberatung.</b> Der Screener zeigt statistische Kandidaten, keine Handelsempfehlungen. Kointegration kann jederzeit brechen (Lucas-Kritik), historische Stationarität garantiert nichts für die Zukunft.</p>
     </div></details>
@@ -285,9 +289,31 @@ function hlClass(h) { return h === null ? 'mut' : (h >= 5 && h <= 40) ? 'g' : h 
 function bar(v, max, col) { const w = Math.max(0, Math.min(100, v / max * 100)); return `<span class="bar"><i style="width:${w}%;background:${col}"></i></span>`; }
 
 // ---- Positionsgrößen ----
-let CAP = 10000, WMODE = 'beta';
-try { CAP = +localStorage.getItem('pairs_cap') || 10000; WMODE = localStorage.getItem('pairs_wmode') || 'beta'; } catch (e) {}
+let CAP = 10000, WMODE = 'beta', SMODE = 'risk', RISK = 500, ZSTOP = 3.5;
+try {
+    CAP = +localStorage.getItem('pairs_cap') || 10000; WMODE = localStorage.getItem('pairs_wmode') || 'beta';
+    SMODE = localStorage.getItem('pairs_smode') || 'risk'; RISK = +localStorage.getItem('pairs_risk') || 500; ZSTOP = +localStorage.getItem('pairs_zstop') || 3.5;
+} catch (e) {}
 document.getElementById('cap').value = CAP; document.getElementById('wmode').value = WMODE;
+document.getElementById('smode').value = SMODE; document.getElementById('risk').value = RISK; document.getElementById('zstop').value = ZSTOP;
+const NOTES = {
+    risk: 'Du gibst vor, wie viel Geld du in diesem Trade maximal verlieren willst, wenn der Spread bis zum Stop (|z| = Stop-Wert) gegen dich läuft. Daraus wird die Long-Summe berechnet: Risiko ÷ (Abstand bis Stop in z × Spread-Standardabweichung). Die Short-Seite folgt mit der Gewichtung. Beträge in der Währung des Paares, bei FX-Paaren in EUR.',
+    cap: 'Stückzahlen gelten für dieses Kapital auf der Long-Seite, in der Währung des Paares (bei FX-Paaren in EUR, Kurse mit aktuellem Wechselkurs umgerechnet). Bei „Hedge Ratio β" ist die Short-Seite β-mal so groß wie die Long-Seite – so ist der Spread neutral; bei β nahe 1 sind beide Seiten praktisch gleich.',
+};
+function applyMode() {
+    document.getElementById('f-risk').style.display = SMODE === 'risk' ? '' : 'none';
+    document.getElementById('f-zstop').style.display = SMODE === 'risk' ? '' : 'none';
+    document.getElementById('f-cap').style.display = SMODE === 'cap' ? '' : 'none';
+    document.getElementById('capnote').textContent = NOTES[SMODE];
+}
+applyMode();
+// Abstand bis zum Stop in % der Long-Summe (log-Spread ≈ Prozent)
+function stopDist(p) { const d = Math.max(ZSTOP - Math.abs(p.z), 0.25); return { dz: d, pct: d * (p.sd || 0) / 100 }; }
+// Long-Summe, die aus den Einstellungen folgt
+function capFor(p) {
+    if (SMODE === 'cap') return CAP;
+    const st = stopDist(p); return st.pct > 0 ? RISK / st.pct : CAP;
+}
 const FXL = M.fx_last || {};
 const curLabel = c => c === 'GBp' ? 'GBP' : c;
 // Umrechnung Lokalwährung -> Anzeigewährung (Paarwährung oder EUR bei FX-Paaren)
@@ -315,16 +341,19 @@ function sizing(p, cap, mode) {
 }
 const nf = (x, d=0) => Number(x).toLocaleString('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d });
 function sizeLine(p) {
-    const z = sizing(p, CAP, WMODE); if (!z) return '<div class="size mut">Keine Kursdaten für die Stückzahl.</div>';
-    return `<div class="size">Bei ${nf(CAP)} ${z.disp}: <b class="lg">Kaufe ${nf(z.nL)} ${z.unit} ${esc(p.long)}</b> (≈ ${nf(z.notL)} ${z.disp})<br><b class="sh">Verkaufe ${nf(z.nS)} ${z.unit} ${esc(p.short)}</b> (≈ ${nf(z.notS)} ${z.disp})</div>`;
+    const z = sizing(p, capFor(p), WMODE); if (!z) return '<div class="size mut">Keine Kursdaten für die Stückzahl.</div>';
+    const head = SMODE === 'risk' ? `Risiko ${nf(RISK)} ${z.disp} (Stop |z| ${fmt(ZSTOP,1)})` : `Bei ${nf(capFor(p))} ${z.disp}`;
+    return `<div class="size">${head}: <b class="lg">Kaufe ${nf(z.nL)} ${z.unit} ${esc(p.long)}</b> (≈ ${nf(z.notL)} ${z.disp})<br><b class="sh">Verkaufe ${nf(z.nS)} ${z.unit} ${esc(p.short)}</b> (≈ ${nf(z.notS)} ${z.disp})</div>`;
 }
 function refreshAll() {
     CAP = Math.max(100, +document.getElementById('cap').value || 10000); WMODE = document.getElementById('wmode').value;
-    try { localStorage.setItem('pairs_cap', CAP); localStorage.setItem('pairs_wmode', WMODE); } catch (e) {}
-    renderSetups(); render(); if (selId !== null) showDetail(selId, false);
+    SMODE = document.getElementById('smode').value; RISK = Math.max(1, +document.getElementById('risk').value || 500);
+    ZSTOP = Math.min(8, Math.max(1, +document.getElementById('zstop').value || 3.5));
+    try { localStorage.setItem('pairs_cap', CAP); localStorage.setItem('pairs_wmode', WMODE); localStorage.setItem('pairs_smode', SMODE); localStorage.setItem('pairs_risk', RISK); localStorage.setItem('pairs_zstop', ZSTOP); } catch (e) {}
+    applyMode(); renderSetups(); render(); if (selId !== null) showDetail(selId, false);
 }
-document.getElementById('cap').addEventListener('input', refreshAll);
-document.getElementById('wmode').addEventListener('change', refreshAll);
+['cap','risk','zstop'].forEach(id => document.getElementById(id).addEventListener('input', refreshAll));
+['wmode','smode'].forEach(id => document.getElementById(id).addEventListener('change', refreshAll));
 
 // Setups
 const setups = P.filter(p => p.status === 'SETUP' || p.status === 'WATCH').sort((a,b) => b.score - a.score).slice(0, 9);
@@ -352,7 +381,7 @@ renderSetups();
 const COLS = [
     {k:'status', l:'Status', cls:'l', r:p => `<span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? '·' : p.status}</span>`, v:p => ({SETUP:3,WATCH:2,EXTREM:1,'-':0})[p.status]},
     {k:'pair', l:'Paar (Long / Short)', cls:'l', r:p => `<span class="pair">${legsHtml(p)}</span>${p.fx ? '<span class="fxtag">FX</span>' : ''}<span class="sub">${esc(p.na)} / ${esc(p.nb)}</span>`, v:p => p.long + p.short},
-    {k:'size', l:'Kaufen / Verkaufen', cls:'l', r:p => { const z = sizing(p, CAP, WMODE); return z ? `<span class="lg">${nf(z.nL)}</span> <span class="mut">×</span> ${esc(p.long)}<br><span class="sh">${nf(z.nS)}</span> <span class="mut">×</span> ${esc(p.short)}` : '–'; }, v:p => p.score},
+    {k:'size', l:'Kaufen / Verkaufen', cls:'l', r:p => { const z = sizing(p, capFor(p), WMODE); return z ? `<span class="lg">${nf(z.nL)}</span> <span class="mut">×</span> ${esc(p.long)}<br><span class="sh">${nf(z.nS)}</span> <span class="mut">×</span> ${esc(p.short)}` : '–'; }, v:p => p.score},
     {k:'sector', l:'Sektor', cls:'l', r:p => `${esc(p.sector)}<span class="sub">${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region}</span>`, v:p => p.sector},
     {k:'z', l:'Z-Score', r:p => `<span class="${zClass(p.z)}">${fmt(p.z)}</span>`, v:p => Math.abs(p.z)},
     {k:'dz', l:'Δz 5d', r:p => { const d = p.z5 === null ? null : p.z - p.z5; return `<span class="dim">${d === null ? '–' : (d > 0 ? '+' : '') + fmt(d)}</span>`; }, v:p => p.z5 === null ? 0 : Math.abs(p.z) - Math.abs(p.z5)},
@@ -411,7 +440,7 @@ function showDetail(id, scroll) {
     F('d-meta').textContent = `${nl} / ${ns} · ${p.sector} · ${p.region === 'Cross' ? p.ra + ' / ' + p.rb : p.region} · ${p.ca === p.cb ? p.ca : p.ca + ' / ' + p.cb + ' (Spread in EUR)'} · ${p.n} gemeinsame Handelstage · Stand ${p.last}`;
     const ratio = p.long === p.a ? p.beta : 1 / p.beta;  // Notional Short pro 1 Notional Long
     F('d-trade').innerHTML = `<b>Trade-Idee:</b> Spread ${p.z > 0 ? 'über' : 'unter'} dem Mittel (z = <b class="${zClass(p.z)}">${fmt(p.z)}</b>): <b>${esc(p.long)}</b> ist relativ zu <b>${esc(p.short)}</b> zu billig → Long ${esc(p.long)}, Short ${esc(p.short)}. Hedge Ratio β = ${fmt(p.beta,3)} (${esc(p.b)} ~ ${esc(p.a)}), d.h. Short-Seite ≈ ${fmt(ratio,2)} × Long-Seite. Erwartete Spread-Bewegung bis zum Mittel: <b>${fmt(p.move,1)}%</b>. Status: <span class="st ${p.status === '-' ? 'none' : p.status}">${p.status === '-' ? 'kein Signal' : p.status}</span>${Math.abs(p.z) >= CFG.z_extreme ? ' – <span class="r">Strukturbruch prüfen!</span>' : ''}`;
-    const z = sizing(p, CAP, WMODE);
+    const z = sizing(p, capFor(p), WMODE);
     if (!z) {
         F('d-size').innerHTML = '<div class="sum">Keine aktuellen Kurse für die Stückzahlberechnung.</div>';
     } else {
@@ -419,7 +448,15 @@ function showDetail(id, scroll) {
         F('d-size').innerHTML = `
             <div class="leg"><div class="h">Long · Kaufen</div><span class="n lg">${nf(z.nL)}</span> ${z.unit} <b>${esc(p.long)}</b><br><span class="mut">${kurs(z.pxL, z.cL, z.mL, z.vL)} · Summe ≈ ${nf(z.notL)} ${z.disp}</span></div>
             <div class="leg"><div class="h">Short · Verkaufen</div><span class="n sh">${nf(z.nS)}</span> ${z.unit} <b>${esc(p.short)}</b><br><span class="mut">${kurs(z.pxS, z.cS, z.mS, z.vS)} · Summe ≈ ${nf(z.notS)} ${z.disp}</span></div>
-            <div class="sum">${z.fut && CAP < Math.min(z.vL, z.vS) ? '<span class="y">Hinweis: Ein Kontrakt ist mehr wert als das eingestellte Kapital – Kapital erhöhen oder Micro-Kontrakte nutzen.</span><br>' : ''}Basis: ${nf(CAP)} ${z.disp} auf der Long-Seite, Gewichtung ${WMODE === 'equal' ? 'gleiches Kapital (1 : 1)' : 'Hedge Ratio β (Short = ' + fmt(z.ratio,2) + ' × Long)'} · tatsächliches Verhältnis Short/Long = ${fmt(z.notS / z.notL, 2)}${z.fut ? ' · Kontrakte sind ganzzahlig gerundet; Micro-Kontrakte erlauben feinere Verhältnisse' : ''}${p.fx ? ' · Cross-Currency-Paar: Beträge in EUR umgerechnet, Währungsrisiko bleibt' : ''}. Kapital und Gewichtung oben bei „Beste Setups" einstellbar.</div>`;
+            <div class="sum">${(() => {
+                const st = stopDist(p), capP = capFor(p), realRisk = z.notL * st.pct;
+                const warnFut = z.fut && capP < Math.min(z.vL, z.vS) ? '<span class="y">Hinweis: Ein Kontrakt ist mehr wert als die errechnete Long-Summe – Risiko erhöhen oder Micro-Kontrakte nutzen.</span><br>' : '';
+                const warnZ = SMODE === 'risk' && Math.abs(p.z) >= ZSTOP ? '<span class="r">Achtung: |z| liegt bereits über dem Stop-Wert – Stop höher setzen oder Paar meiden.</span><br>' : '';
+                const basis = SMODE === 'risk'
+                    ? `<b>Herleitung:</b> Stop bei |z| = ${fmt(ZSTOP,1)}, aktuell |z| = ${fmt(Math.abs(p.z))} → Abstand ${fmt(st.dz)} z × Spread-σ ${fmt(p.sd,2)} % = <b>${fmt(st.pct*100,2)} %</b> Spread-Weg bis zum Stop. Long-Summe = ${nf(RISK)} ÷ ${fmt(st.pct*100,2)} % = <b>${nf(capP)} ${z.disp}</b>.`
+                    : `Basis: ${nf(capP)} ${z.disp} auf der Long-Seite.`;
+                return warnFut + warnZ + basis + ` Gewichtung ${WMODE === 'equal' ? 'gleiches Kapital (1 : 1)' : 'Hedge Ratio β (Short = ' + fmt(z.ratio,2) + ' × Long)'} · tatsächliches Verhältnis Short/Long = ${fmt(z.notS / z.notL, 2)} · <b>tatsächliches Risiko bis Stop ≈ ${nf(realRisk)} ${z.disp}</b> (nach Rundung der Stückzahlen; ohne Gap-, Kosten- und Währungseffekte)${z.fut ? ' · Kontrakte ganzzahlig gerundet, Micro-Kontrakte erlauben feinere Verhältnisse' : ''}${p.fx ? ' · Cross-Currency-Paar: Beträge in EUR, Währungsrisiko bleibt' : ''}. Einstellungen oben bei „Beste Setups".`;
+            })()}</div>`;
     }
     F('d-facts').innerHTML = [
         ['Z-Score', fmt(p.z), 'vor 5d ' + fmt(p.z5) + ' · vor 20d ' + fmt(p.z20), zClass(p.z)],
@@ -428,7 +465,7 @@ function showDetail(id, scroll) {
         ['Half-Life', p.hl === null ? '∞' : fmt(p.hl,1) + ' d', 'Nulldurchgänge: ' + p.zc, hlClass(p.hl)],
         ['Hurst', fmt(p.hurst), p.hurst < 0.4 ? 'mean-reverting' : p.hurst < 0.5 ? 'leicht mean-rev.' : 'trendend', p.hurst < 0.4 ? 'g' : p.hurst < 0.5 ? 'y' : 'r'],
         ['Beta-Drift', fmt(p.drift), p.drift < 0.15 ? 'stabil' : p.drift < 0.35 ? 'mäßig' : 'instabil', p.drift < 0.15 ? 'g' : p.drift < 0.35 ? 'y' : 'r'],
-        ['Spread-Vola p.a.', fmt(p.svol,1) + '%', 'Tage seit Ø: ' + p.dsc, ''],
+        ['Spread-σ', fmt(p.sd,2) + '%', 'Vola p.a. ' + fmt(p.svol,1) + '% · Tage seit Ø: ' + p.dsc, ''],
         ['Qualität / Score', fmt(p.q,0) + ' / ' + fmt(p.score,0), 'von 100', ''],
     ].map(([l,v,s,c]) => `<div class="fact"><div class="l">${l}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`).join('');
 

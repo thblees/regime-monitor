@@ -310,6 +310,7 @@ def analyze_pair(a, b, pa, pb):
         "zero_cross": zc, "days_since_cross": dsc, "spread_vol": spread_vol,
         "beta_drift": drift, "z": z_now, "z5": z_5, "z20": z_20,
         "exp_move_pct": float(abs(z_now) * sd * 100),
+        "spread_sd_pct": float(sd * 100),
         "quality": float(q), "score": float(total), "status": status,
         "long": long_leg, "short": short_leg, "n": int(len(df)),
         "last_date": df.index[-1].strftime("%Y-%m-%d"),
@@ -398,7 +399,8 @@ def main():
             "corr_full": fnum(r["corr_full"], 3), "hl": fnum(r["half_life"], 1), "hurst": fnum(r["hurst"], 3),
             "zc": r["zero_cross"], "dsc": r["days_since_cross"], "svol": fnum(r["spread_vol"], 1),
             "drift": fnum(r["beta_drift"], 3), "z": fnum(r["z"], 2), "z5": fnum(r["z5"], 2), "z20": fnum(r["z20"], 2),
-            "move": fnum(r["exp_move_pct"], 1), "q": fnum(r["quality"], 1), "score": fnum(r["score"], 1),
+            "move": fnum(r["exp_move_pct"], 1), "sd": fnum(r["spread_sd_pct"], 2),
+            "q": fnum(r["quality"], 1), "score": fnum(r["score"], 1),
             "status": r["status"], "long": r["long"], "short": r["short"], "n": r["n"], "last": r["last_date"],
             "asset": r["asset"], "ma": r["mult_a"], "mb": r["mult_b"], "pxa": fnum(r["last_a"], 2), "pxb": fnum(r["last_b"], 2),
         }
