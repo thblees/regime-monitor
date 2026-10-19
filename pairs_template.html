@@ -202,7 +202,7 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
             <div class="chart-box"><canvas id="c-z"></canvas></div>
         </div>
         <div>
-            <div class="chart-label">Kursverlauf · indexiert auf 100</div>
+            <div class="chart-label">Kurs vs. Modellwert (β-gewichtet) · indexiert auf 100 · Abstand = Spread</div>
             <div class="legend" id="d-legend"></div>
             <div class="chart-box"><canvas id="c-px"></canvas></div>
         </div>
@@ -260,6 +260,7 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
     </div></details>
     <details><summary>Z-Score, Half-Life, Hurst, Beta-Drift</summary><div class="body">
         <p><b>Z-Score</b>: aktueller Spread geteilt durch seine Standardabweichung über das Regressionsfenster. |z| ≥ 2 heißt: der Spread ist ungewöhnlich weit vom Mittel entfernt – das klassische Einstiegssignal. z &gt; 0 bedeutet, Aktie B ist relativ zu A zu teuer → <span class="sh">Short B</span> / <span class="lg">Long A</span>. Bei |z| ≥ 4 steht das Paar auf <span class="st EXTREM">EXTREM</span>: Verdacht auf Strukturbruch (Übernahme, Gewinnwarnung, Indexänderung) – erst Nachrichten prüfen.</p>
+        <p><b>Warum zeigt der Kurschart manchmal keine Ausweitung, obwohl |z| groß ist?</b> Der Spread ist nicht der Abstand zweier 1:1 indexierter Kurslinien, sondern <code>log(B) − β·log(A) − α</code>. Bei β = 0,5 „darf" B nur halb so stark steigen wie A; läuft B trotzdem mit A mit, ist der Spread weit vom Mittel, obwohl beide Linien im 1:1-Chart übereinanderliegen. Der Chart in der Detailansicht zeigt deshalb B gegen seinen <b>Modellwert aus A</b> (blaue Linie): Der Abstand dieser beiden Linien ist der Spread, den der Z-Score misst. Die graue Linie ist A 1:1 zum Vergleich. Je weiter β von 1 entfernt ist, desto mehr hängt der Trade von der Stabilität von β ab (siehe Beta-Drift).</p>
         <p><b>Half-Life</b> (Halbwertszeit): aus einer AR(1)-Regression des Spreads geschätzte Anzahl Handelstage, bis sich eine Abweichung halbiert hat. Ideal für Swing-Pairs sind 5–40 Tage. Unter 5 Tagen frisst der Handel die Bewegung auf, über 60 Tagen bindet die Position zu lange Kapital.</p>
         <p><b>Hurst-Exponent</b> des Spreads: 0.5 = Random Walk, deutlich unter 0.5 = mean-reverting (gut), über 0.5 = trendend (schlecht für Pairs).</p>
         <p><b>Beta-Drift</b>: relative Abweichung der Hedge Ratio zwischen erster und zweiter Hälfte des Fensters. Hohe Werte bedeuten eine instabile Beziehung.</p>
@@ -267,6 +268,7 @@ details .body code { font-family:var(--mono); font-size:12px; color:var(--blue);
     </div></details>
     <details><summary>Qualitäts- und Gesamt-Score</summary><div class="body">
         <p>Der <b>Qualitäts-Score</b> (0–100) bewertet die statistische Eignung des Paares unabhängig vom heutigen Signal: Kointegration bis 35 Punkte (p=0 → 35, p ≥ 0.10 → 0), Korrelation bis 20 (0.30 → 0, 0.90 → 20), Half-Life bis 20 (volle Punkte bei 5–40 Tagen), Beta-Stabilität bis 10, Hurst bis 15 (H ≤ 0.2 → 15, H ≥ 0.5 → 0).</p>
+        <p>Den Status <b>SETUP</b> bzw. <b>WATCH</b> erhalten nur Paare mit Qualität ≥ 55 <i>und</i> einer Renditekorrelation von mindestens 0,40. Ein Paar kann statistisch kointegriert sein und trotzdem im Alltag kaum gemeinsam schwanken – solche Spreads sind launisch und bleiben in der Tabelle, aber nicht in den Setups.</p>
         <p>Der <b>Gesamt-Score</b> multipliziert die Qualität mit dem Signal <code>min(|z| / 2, 1)</code>. Ein hervorragendes Paar ohne aktuelle Abweichung landet also unten in der Liste – es ist heute schlicht nicht handelbar. Bei |z| ≥ 4 wird der Score um 30 % gekürzt.</p>
         <p><b>Erw. Bewegung</b>: Spread-Rückkehr zum Mittel in Prozent (|z| × Spread-Standardabweichung) – das theoretische Potenzial des Trades vor Kosten, wenn der Spread vollständig schließt.</p>
     </div></details>
@@ -513,7 +515,7 @@ function showDetail(id, scroll) {
 
     const s = p.series;
     const hasS = !!s;
-    F('d-legend').innerHTML = hasS ? `<span><i style="background:#60a5fa"></i>${esc(p.a)} (${esc(p.na)})</span><span><i style="background:#fbbf24"></i>${esc(p.b)} (${esc(p.nb)})</span>` : '';
+    F('d-legend').innerHTML = hasS ? `<span><i style="background:#fbbf24"></i>${esc(p.b)} tatsächlich (${esc(p.nb)})</span><span><i style="background:#60a5fa"></i>${esc(p.b)} laut Modell aus ${esc(p.a)} (β = ${fmt(p.beta,2)})</span><span><i style="background:#64748b"></i>${esc(p.a)} (${esc(p.na)}, 1:1 indexiert)</span>` : '';
     if (chZ) { chZ.destroy(); chZ = null; } if (chPx) { chPx.destroy(); chPx = null; }
     if (!HAS_CHART) {
         F('d-legend').innerHTML = '<span class="mut">Chart-Bibliothek konnte nicht geladen werden (CDN blockiert?). Kennzahlen oben bleiben gültig.</span>';
@@ -530,8 +532,9 @@ function showDetail(id, scroll) {
             plugins: { legend: { display: false }, tooltip: { filter: i => i.datasetIndex === 0, callbacks: { title: it => s.dates[it[0].dataIndex], label: it => 'z = ' + fmt(it.raw) } } },
             scales: { x: { ticks: { maxTicksLimit: 8, maxRotation: 0 }, grid: { display: false } }, y: { suggestedMin: -3, suggestedMax: 3, grid: { color: '#1f2a3e' } } } } });
         chPx = new Chart(F('c-px'), { type: 'line', data: { labels, datasets: [
-            { label: p.a, data: s.pa, borderColor: '#60a5fa', borderWidth: 2, pointRadius: 0, tension: 0.1 },
-            { label: p.b, data: s.pb, borderColor: '#fbbf24', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+            { label: p.b + ' tatsächlich', data: s.pb, borderColor: '#fbbf24', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+            { label: p.b + ' laut Modell', data: s.fit || [], borderColor: '#60a5fa', borderWidth: 2, pointRadius: 0, tension: 0.1 },
+            { label: p.a + ' (1:1)', data: s.pa, borderColor: '#64748b', borderWidth: 1, pointRadius: 0, tension: 0.1, borderDash: [3,3] },
         ]}, options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false },
             plugins: { legend: { display: false }, tooltip: { callbacks: { title: it => s.dates[it[0].dataIndex], label: it => it.dataset.label + ': ' + fmt(it.raw, 1) } } },
             scales: { x: { ticks: { maxTicksLimit: 8, maxRotation: 0 }, grid: { display: false } }, y: { grid: { color: '#1f2a3e' } } } } });

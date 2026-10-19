@@ -48,6 +48,7 @@ CFG = {
     "z_setup": 2.0,            # |z| ab dem ein Paar als SETUP gilt
     "z_watch": 1.5,            # |z| ab dem ein Paar auf WATCH steht
     "quality_min": 55,         # Mindest-Qualitätsscore für SETUP/WATCH
+    "status_min_corr": 0.40,   # Mindest-Renditekorrelation (1J) für SETUP/WATCH
     "z_extreme": 4.0,          # ab hier Verdacht auf Strukturbruch
 }
 
@@ -304,9 +305,10 @@ def analyze_pair(a, b, pa, pb):
     if abs(z_now) >= CFG["z_extreme"]:
         total *= 0.7
 
-    if q >= CFG["quality_min"] and abs(z_now) >= CFG["z_setup"]:
+    eligible = q >= CFG["quality_min"] and corr >= CFG["status_min_corr"]
+    if eligible and abs(z_now) >= CFG["z_setup"]:
         status = "SETUP"
-    elif q >= CFG["quality_min"] and abs(z_now) >= CFG["z_watch"]:
+    elif eligible and abs(z_now) >= CFG["z_watch"]:
         status = "WATCH"
     else:
         status = "-"
@@ -331,6 +333,7 @@ def analyze_pair(a, b, pa, pb):
         "last_date": df.index[-1].strftime("%Y-%m-%d"),
         "_z_series": z.tail(CFG["series_days"]),
         "_pa": pa_.tail(CFG["series_days"]), "_pb": pb_.tail(CFG["series_days"]),
+        "_fit": np.exp(alpha + beta * la).tail(CFG["series_days"]),
     }
 
 
@@ -430,12 +433,13 @@ def main():
         }
         if id(r) in with_series:
             zs = r["_z_series"]
-            pa, pb = r["_pa"], r["_pb"]
+            pa, pb, fit = r["_pa"], r["_pb"], r["_fit"]
             d["series"] = {
                 "dates": [x.strftime("%Y-%m-%d") for x in zs.index],
                 "z": [fnum(v, 2) for v in zs.values],
                 "pa": [fnum(v / pa.iloc[0] * 100, 1) for v in pa.values],
                 "pb": [fnum(v / pb.iloc[0] * 100, 1) for v in pb.values],
+                "fit": [fnum(v / pb.iloc[0] * 100, 1) for v in fit.values],   # Modellwert von b, gleiche Basis wie pb
             }
         pairs_json.append(d)
 
